@@ -88,7 +88,7 @@ private val SoftRose = Color(0xFFF4E2DD)
 private val AuthExecutor = Executors.newSingleThreadExecutor()
 
 private enum class MainTab(val title: String) {
-    HOME("Главная"), LEARN("Уроки"), SEARCH("Поиск"), ACCOUNTS("Аккаунты"), SETTINGS("Настройки")
+    HOME("Главная"), LEARN("Уроки"), DIALOGUES("Диалоги"), SEARCH("Поиск"), ACCOUNTS("Аккаунты"), SETTINGS("Настройки")
 }
 
 class MainActivity : ComponentActivity() {
@@ -529,6 +529,130 @@ private fun ChineseAudioButton(hanzi: String, pinyin: String) {
 
 private fun ttsLocaleSafe(): Locale = Locale.SIMPLIFIED_CHINESE
 
+
+private data class DialogueLine(val speaker: Int, val hanzi: String, val pinyin: String, val russian: String)
+private data class ChineseDialogue(val title: String, val lines: List<DialogueLine>)
+private val starterDialogues = listOf(
+    ChineseDialogue("Знакомство · 认识新朋友", listOf(
+        DialogueLine(0,"你好！你叫什么名字？","Nǐ hǎo! Nǐ jiào shénme míngzi?","Привет! Как тебя зовут?"),
+        DialogueLine(1,"我叫安娜。你呢？","Wǒ jiào Ānnà. Nǐ ne?","Меня зовут Анна. А тебя?"),
+        DialogueLine(0,"我叫大卫。很高兴认识你。","Wǒ jiào Dàwèi. Hěn gāoxìng rènshi nǐ.","Меня зовут Давэй. Рад познакомиться."),
+        DialogueLine(1,"我也很高兴！","Wǒ yě hěn gāoxìng!","Я тоже рада!")
+    )),
+    ChineseDialogue("В кафе · 在咖啡馆", listOf(
+        DialogueLine(0,"你想喝什么？","Nǐ xiǎng hē shénme?","Что хотите выпить?"),
+        DialogueLine(1,"我想喝一杯茶。","Wǒ xiǎng hē yì bēi chá.","Я хочу чашку чая."),
+        DialogueLine(0,"还要别的吗？","Hái yào bié de ma?","Что-нибудь ещё?"),
+        DialogueLine(1,"不用了，谢谢！","Bú yòng le, xièxie!","Нет, спасибо!")
+    )),
+    ChineseDialogue("Как пройти? · 问路", listOf(
+        DialogueLine(0,"地铁站在哪儿？","Dìtiě zhàn zài nǎr?","Где станция метро?"),
+        DialogueLine(1,"一直走，然后左转。","Yìzhí zǒu, ránhòu zuǒ zhuǎn.","Идите прямо, затем налево."),
+        DialogueLine(0,"远不远？","Yuǎn bu yuǎn?","Это далеко?"),
+        DialogueLine(1,"走五分钟就到。","Zǒu wǔ fēnzhōng jiù dào.","Пешком пять минут.")
+    )),
+    ChineseDialogue("Покупки · 买东西", listOf(
+        DialogueLine(0,"这个多少钱？","Zhège duōshao qián?","Сколько это стоит?"),
+        DialogueLine(1,"三十五块。","Sānshíwǔ kuài.","Тридцать пять юаней."),
+        DialogueLine(0,"可以便宜一点儿吗？","Kěyǐ piányi yìdiǎnr ma?","Можно немного дешевле?"),
+        DialogueLine(1,"好吧，三十块。","Hǎo ba, sānshí kuài.","Ладно, тридцать юаней.")
+    ))
+)
+
+@Composable
+private fun DialoguesScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var ready by remember { mutableStateOf(false) }
+    var audioError by remember { mutableStateOf(false) }
+    var expanded by remember { mutableIntStateOf(0) }
+    val tts = remember(context) {
+        TextToSpeech(context.applicationContext) { status ->
+            ready = status == TextToSpeech.SUCCESS
+            if (status != TextToSpeech.SUCCESS) audioError = true
+        }
+    }
+    DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
+    fun speakLine(item: DialogueLine, queue: Int = TextToSpeech.QUEUE_FLUSH) {
+        if (!ready) { audioError = true; return }
+        val result = tts.setLanguage(Locale.SIMPLIFIED_CHINESE)
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) { audioError = true; return }
+        tts.setPitch(if (item.speaker == 0) 1.08f else 0.88f)
+        tts.setSpeechRate(0.86f)
+        tts.speak(item.hanzi, queue, null, "dialog_" + item.speaker + "_" + item.hanzi.hashCode() + "_" + System.nanoTime())
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        .background(Brush.verticalGradient(listOf(Paper, Color(0xFFFFF1E2), Color(0xFFF8E9DF))))
+        .padding(horizontal = 18.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("对话 · Диалоги", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Озвучка обеих ролей · 双人会话", color = Muted, fontSize = 13.sp)
+            }
+            DragonMascot(60)
+        }
+        Surface(shape = RoundedCornerShape(26.dp), color = DeepRed.copy(alpha = 0.96f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.65f)), shadowElevation = 7.dp) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("TWO VOICES · A + B", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                Text("Живой китайский — реплика за репликой", color = Paper, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Слушай весь диалог или каждую реплику отдельно. Роли различаются высотой голоса; для настоящих разных тембров нужен установленный китайский TTS-движок с несколькими голосами.", color = Paper.copy(alpha = 0.84f), fontSize = 12.sp)
+            }
+        }
+        if (audioError) Surface(shape = RoundedCornerShape(14.dp), color = SoftRose) {
+            Text("Китайский голос недоступен. Проверь настройки Text-to-Speech и установи голос 简体中文.", Modifier.padding(12.dp), color = Lacquer, fontSize = 12.sp)
+        }
+        starterDialogues.forEachIndexed { index, dialogue ->
+            val isExpanded = expanded == index
+            Surface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.72f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.95f)),
+                shadowElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(dialogue.title, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("4 реплики · pinyin + перевод", color = Muted, fontSize = 11.sp)
+                        }
+                        Surface(shape = RoundedCornerShape(15.dp), color = Lacquer,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.75f)),
+                            modifier = Modifier.clickable {
+                                expanded = index
+                                dialogue.lines.forEachIndexed { n, item ->
+                                    speakLine(item, if (n == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD)
+                                }
+                            }) {
+                            Row(Modifier.padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.VolumeUp, null, tint = Gold, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(if (ready) "Слушать всё" else "Загрузка…", color = Paper, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    if (isExpanded) dialogue.lines.forEach { item ->
+                        val roleColor = if (item.speaker == 0) Lacquer else Color(0xFF8A6426)
+                        Surface(shape = RoundedCornerShape(18.dp),
+                            color = if (item.speaker == 0) Color.White.copy(alpha = 0.84f) else Color(0xFFFFF0D4).copy(alpha = 0.84f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, roleColor.copy(alpha = 0.18f))) {
+                            Row(Modifier.fillMaxWidth().padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(if (item.speaker == 0) "角色 A · Роль A" else "角色 B · Роль B", color = roleColor, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                                    Text(item.hanzi, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                                    Text(item.pinyin, color = Lacquer, fontSize = 12.sp)
+                                    Text(item.russian, color = Muted, fontSize = 12.sp)
+                                }
+                                IconButton(onClick = { speakLine(item) }) { Icon(Icons.Default.VolumeUp, contentDescription = "Озвучить реплику", tint = roleColor) }
+                            }
+                        }
+                    }
+                    TextButton(onClick = { expanded = if (isExpanded) -1 else index }) {
+                        Text(if (isExpanded) "Свернуть ↑" else "Открыть реплики ↓", color = Lacquer, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        Text("Совет: прослушай диалог целиком, затем повторяй каждую реплику отдельно.", color = Muted, fontSize = 12.sp)
+    }
+}
+
 @Composable
 private fun MainShell(
     context: Context,
@@ -567,6 +691,7 @@ private fun MainShell(
                 when (tab) {
                     MainTab.HOME -> HomeScreen(email, onStartLearning = { onTabSelected(MainTab.LEARN) })
                     MainTab.LEARN -> LessonsScreen(context)
+                    MainTab.DIALOGUES -> DialoguesScreen()
                     MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
                     MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
                     MainTab.SETTINGS -> SettingsScreen(context, email, onLogout)
@@ -758,6 +883,7 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
 private fun tabIcon(tab: MainTab) = when (tab) {
     MainTab.HOME -> Icons.Default.Home
     MainTab.LEARN -> Icons.Default.Book
+    MainTab.DIALOGUES -> Icons.Default.VolumeUp
     MainTab.SEARCH -> Icons.Default.Search
     MainTab.ACCOUNTS -> Icons.Default.Person
     MainTab.SETTINGS -> Icons.Default.Settings
