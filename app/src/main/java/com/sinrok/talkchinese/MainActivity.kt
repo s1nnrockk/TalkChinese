@@ -982,6 +982,57 @@ private fun GlassLessonCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+private data class DictionaryEntry(
+    val hanzi: String,
+    val pinyin: String,
+    val russian: List<String>,
+    val english: List<String>,
+    val level: Int
+)
+
+@Volatile
+private var cachedDictionary: List<DictionaryEntry>? = null
+
+private fun readDictionary(context: Context): List<DictionaryEntry> {
+    cachedDictionary?.let { return it }
+    return synchronized(DictionaryEntry::class.java) {
+        cachedDictionary?.let { return@synchronized it }
+        readDictionaryUncached(context).also { cachedDictionary = it }
+    }
+}
+
+private fun readDictionaryUncached(context: Context): List<DictionaryEntry> {
+    val raw = context.assets.open("hsk.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
+    val array = org.json.JSONArray(raw)
+    return buildList(array.length()) {
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val translations = item.optJSONObject("translations")
+            fun readTerms(key: String): List<String> {
+                val value = translations?.opt(key) ?: return emptyList()
+                return when (value) {
+                    is org.json.JSONArray -> (0 until value.length()).mapNotNull { i ->
+                        value.optString(i).takeIf { it.isNotBlank() }
+                    }
+                    is String -> listOf(value).filter { it.isNotBlank() }
+                    else -> emptyList()
+                }
+            }
+            val hanzi = item.optString("hanzi").trim()
+            if (hanzi.isBlank()) continue
+            add(
+                DictionaryEntry(
+                    hanzi = hanzi,
+                    pinyin = item.optString("pinyin").trim(),
+                    russian = readTerms("rus"),
+                    english = readTerms("eng"),
+                    level = item.optInt("level", 0)
+                )
+            )
+        }
+    }
+}
+
 private fun normalizeDictionaryQuery(value: String): String {
     return Normalizer.normalize(value.lowercase().replace('ü', 'v'), Normalizer.Form.NFD)
         .replace(Regex("\\p{M}+"), "")
