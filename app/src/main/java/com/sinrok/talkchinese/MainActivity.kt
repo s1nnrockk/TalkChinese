@@ -3,6 +3,7 @@ package com.sinrok.talkchinese
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateContentSize
@@ -46,9 +47,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.text.Normalizer
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
@@ -477,6 +481,53 @@ private fun DragonMascot(size: Int) {
         )
     }
 }
+
+@Composable
+private fun ChineseAudioButton(hanzi: String, pinyin: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var ready by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val tts = remember(context) {
+        TextToSpeech(context.applicationContext) { status ->
+            ready = status == TextToSpeech.SUCCESS
+            if (status == TextToSpeech.SUCCESS) {
+                val result = ttsLocaleSafe()
+                // The locale is applied in the click handler as well, in case the engine
+                // finishes initialization after the screen has been composed.
+            } else {
+                failed = true
+            }
+        }
+    }
+    DisposableEffect(tts) {
+        onDispose { tts.stop(); tts.shutdown() }
+    }
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.70f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.65f))
+    ) {
+        Row(
+            modifier = Modifier.clickable {
+                if (ready) {
+                    val locale = Locale.SIMPLIFIED_CHINESE
+                    val localeResult = tts.setLanguage(locale)
+                    if (localeResult != TextToSpeech.LANG_MISSING_DATA && localeResult != TextToSpeech.LANG_NOT_SUPPORTED) {
+                        tts.setSpeechRate(0.82f)
+                        tts.speak(hanzi, TextToSpeech.QUEUE_FLUSH, null, "talkchinese_${hanzi}_${pinyin}")
+                    } else failed = true
+                } else failed = true
+            }.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(Icons.Default.VolumeUp, contentDescription = "Прослушать китайское произношение", tint = Lacquer, modifier = Modifier.size(21.dp))
+            Text(if (failed) "Аудио недоступно" else if (ready) "听 · Слушать" else "Загрузка…", color = Lacquer, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+private fun ttsLocaleSafe(): Locale = Locale.SIMPLIFIED_CHINESE
 
 @Composable
 private fun MainShell(
@@ -929,11 +980,19 @@ private fun LessonsScreen(context: Context) {
                         Text(word.hanzi, color = Lacquer, fontSize = 54.sp, fontWeight = FontWeight.ExtraBold)
                     }
                     if (showPinyin) Text(word.pinyin.ifBlank { "Пиньинь не указан" }, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    Text(meaning.ifBlank { "Перевод не указан" }, color = Lacquer, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(meaning.ifBlank { "Перевод не указан" }, modifier = Modifier.weight(1f), color = Lacquer, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        ChineseAudioButton(hanzi = word.hanzi, pinyin = word.pinyin)
+                    }
+                    Text("听一听 · Нажми на динамик, чтобы услышать произношение на китайском.", color = Muted, fontSize = 11.sp)
                     if (word.russian.size > 1) Text("Другие значения: ${word.russian.drop(1).take(4).joinToString(" · ")}", color = Muted, fontSize = 12.sp)
                     HorizontalDivider(color = Gold.copy(alpha = .45f))
                     Text("КАК ЗАПОМНИТЬ", color = Lacquer, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, letterSpacing = 1.2.sp)
-                    Text("Свяжи три вещи: иероглиф, звучание и смысл. В пиньине знаки над гласными показывают тон — в китайском тон меняет значение слова.", color = Ink, fontSize = 14.sp)
+                    Text("Свяжи иероглиф, звучание и смысл. В китайском четыре основных тона и нейтральный: ровный, восходящий, сначала вниз-вверх и резкий нисходящий. Слушай пример и повторяй вслух.", color = Ink, fontSize = 14.sp)
                     Surface(shape = RoundedCornerShape(16.dp), color = Color.White.copy(alpha = .55f), border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .85f))) {
                         Text("Сначала посмотри на 汉字, затем попробуй вспомнить произношение и перевод, не глядя на ответ.", Modifier.fillMaxWidth().padding(13.dp), color = Muted, fontSize = 12.sp)
                     }
