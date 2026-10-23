@@ -28,6 +28,15 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Validate Supabase configuration secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" || { echo "::error::Missing repository secret SUPABASE_URL"; exit 1; }
+          test -n "$SUPABASE_ANON_KEY" || { echo "::error::Missing repository secret SUPABASE_ANON_KEY"; exit 1; }
+          echo "Supabase configuration secrets are present; values are not displayed."
+
       - name: Build debug APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
