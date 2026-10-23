@@ -2,6 +2,7 @@ package com.sinrok.talkchinese
 
 import android.os.Bundle
 import android.content.Context
+import android.app.Activity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
