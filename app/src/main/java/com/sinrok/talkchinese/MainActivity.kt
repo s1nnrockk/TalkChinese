@@ -5,6 +5,8 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -12,6 +14,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -410,12 +416,26 @@ private fun MainShell(
             Modifier.fillMaxSize().padding(padding)
                 .background(Brush.verticalGradient(listOf(Paper, Color(0xFFFFF2E4))))
         ) {
-            when (selectedTab) {
-                MainTab.HOME -> HomeScreen(email, onStartLearning = { onTabSelected(MainTab.LEARN) })
-                MainTab.LEARN -> LessonsScreen(context)
-                MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
-                MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
-                MainTab.SETTINGS -> SettingsScreen(email, onLogout)
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(260)) + slideInHorizontally(
+                        animationSpec = tween(320),
+                        initialOffsetX = { fullWidth -> fullWidth / 14 }
+                    )).togetherWith(fadeOut(animationSpec = tween(180)) + slideOutHorizontally(
+                        animationSpec = tween(240),
+                        targetOffsetX = { fullWidth -> -fullWidth / 18 }
+                    ))
+                },
+                label = "liquidTabTransition"
+            ) { tab ->
+                when (tab) {
+                    MainTab.HOME -> HomeScreen(email, onStartLearning = { onTabSelected(MainTab.LEARN) })
+                    MainTab.LEARN -> LessonsScreen(context)
+                    MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
+                    MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
+                    MainTab.SETTINGS -> SettingsScreen(context, email, onLogout)
+                }
             }
         }
     }
@@ -435,9 +455,9 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xFFFDFBFA).copy(alpha = 0.96f),
-                            Color(0xFFF6EAE6).copy(alpha = 0.98f),
-                            Color(0xFFFFFDF8)
+                            Color(0xFFFDFBFA).copy(alpha = 0.78f),
+                            Color(0xFFF6EAE6).copy(alpha = 0.86f),
+                            Color(0xFFFFFDF8).copy(alpha = 0.91f)
                         )
                     )
                 )
@@ -972,46 +992,67 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
 
 @Composable
 private fun AccountsScreen(email: String, onLogout: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        Text("Аккаунт", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-        Surface(shape = RoundedCornerShape(26.dp), color = CardWhite, shadowElevation = 4.dp) {
-            Column(
-                Modifier.fillMaxWidth().padding(22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                BrandMark(70)
-                Text(email, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Row(
-                    Modifier.clip(CircleShape).background(Color(0xFFE5F2E6)).padding(horizontal = 13.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF2F7545), modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Сессия проверена сервером", color = Color(0xFF2F7545), fontSize = 12.sp)
+    val displayName = email.substringBefore("@").replace(".", " ").replace("_", " ")
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Аккаунт", color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Surface(shape = RoundedCornerShape(30.dp), color = CardWhite, shadowElevation = 4.dp) {
+            Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
+                Box(Modifier.size(76.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFFFE6D8), Color(0xFFD7A9A0)))), contentAlignment = Alignment.Center) {
+                    Text(displayName.take(1).uppercase().ifBlank { "你" }, color = DeepRed, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
                 }
-                Text("Данные аккаунта подтверждаются Supabase. При недействительной сессии приложение попросит войти снова.", color = Muted, fontSize = 13.sp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(displayName.ifBlank { "Ученик TalkChinese" }, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Text(email, color = Muted, fontSize = 12.sp)
+                    Text("Участник TalkChinese", color = Lacquer, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
-        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp)) {
-            Text("Выйти из аккаунта", color = Lacquer)
+        Text("АККАУНТ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Surface(shape = RoundedCornerShape(22.dp), color = CardWhite) {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                SettingRow(Icons.Default.Person, "Профиль", "Вход через Supabase")
+                HorizontalDivider(Modifier.padding(vertical = 13.dp), color = SoftRose)
+                SettingRow(Icons.Default.CheckCircle, "Защита аккаунта", "Сессия проверяется сервером")
+            }
+        }
+        Surface(shape = RoundedCornerShape(22.dp), color = CardWhite) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Учебный профиль", color = Lacquer, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Прогресс уроков хранится на этом устройстве. Не удаляй данные приложения, если хочешь сохранить локальную статистику.", color = Muted, fontSize = 13.sp)
+            }
+        }
+        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp)) {
+            Text("Выйти из аккаунта", color = Lacquer, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
-private fun SettingsScreen(email: String, onLogout: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        Text("Настройки", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-        Surface(shape = RoundedCornerShape(23.dp), color = CardWhite, shadowElevation = 3.dp) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Аккаунт и безопасность", color = Lacquer, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+private fun SettingsScreen(context: Context, email: String, onLogout: () -> Unit) {
+    val prefs = remember(context) { context.getSharedPreferences("talkchinese_ui_settings", Context.MODE_PRIVATE) }
+    var soundEnabled by remember { mutableStateOf(prefs.getBoolean("sound", true)) }
+    var dailyReminder by remember { mutableStateOf(prefs.getBoolean("daily_reminder", false)) }
+    var showPinyin by remember { mutableStateOf(prefs.getBoolean("show_pinyin", true)) }
+    var haptics by remember { mutableStateOf(prefs.getBoolean("haptics", true)) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Настройки", color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Персонализируй обучение", color = Muted, fontSize = 14.sp)
+        Text("ОБУЧЕНИЕ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Surface(shape = RoundedCornerShape(24.dp), color = CardWhite, shadowElevation = 2.dp) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                PreferenceRow("Показывать пиньинь", "Подсказка под иероглифами", showPinyin) { showPinyin = it; prefs.edit().putBoolean("show_pinyin", it).apply() }
+                HorizontalDivider(color = SoftRose)
+                PreferenceRow("Звуки", "Звуковые сигналы приложения", soundEnabled) { soundEnabled = it; prefs.edit().putBoolean("sound", it).apply() }
+                HorizontalDivider(color = SoftRose)
+                PreferenceRow("Тактильный отклик", "Вибрация при взаимодействии", haptics) { haptics = it; prefs.edit().putBoolean("haptics", it).apply() }
+                HorizontalDivider(color = SoftRose)
+                PreferenceRow("Ежедневные напоминания", "Настройка сохраняется на устройстве", dailyReminder) { dailyReminder = it; prefs.edit().putBoolean("daily_reminder", it).apply() }
+            }
+        }
+        Text("АККАУНТ И БЕЗОПАСНОСТЬ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Surface(shape = RoundedCornerShape(24.dp), color = CardWhite, shadowElevation = 2.dp) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                 SettingRow(Icons.Default.Person, "Аккаунт", email)
                 HorizontalDivider(color = SoftRose)
                 SettingRow(Icons.Default.Lock, "Авторизация", "Supabase Auth")
@@ -1019,16 +1060,26 @@ private fun SettingsScreen(email: String, onLogout: () -> Unit) {
                 SettingRow(Icons.Default.CheckCircle, "Проверка сессии", "При запуске приложения")
             }
         }
-        Surface(shape = RoundedCornerShape(23.dp), color = CardWhite, shadowElevation = 3.dp) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("О TalkChinese", color = Lacquer, fontWeight = FontWeight.Bold)
-                Text("Версия 0.1.0", color = Ink, fontSize = 14.sp)
-                Text("Изучай китайский шаг за шагом.", color = Muted, fontSize = 13.sp)
+        Surface(shape = RoundedCornerShape(24.dp), color = CardWhite) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("О TalkChinese", color = Lacquer, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Версия 0.2 · Китайский каждый день", color = Ink, fontSize = 14.sp)
+                Text("Настройки сохраняются на этом устройстве. Напоминания пока являются переключателем предпочтения, а не системным уведомлением.", color = Muted, fontSize = 12.sp)
             }
         }
-        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp)) {
-            Text("Выйти", color = Lacquer)
+        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(18.dp)) { Text("Выйти из аккаунта", color = Lacquer) }
+    }
+}
+
+
+@Composable
+private fun PreferenceRow(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(detail, color = Muted, fontSize = 11.sp)
         }
+        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = Paper, checkedTrackColor = Lacquer))
     }
 }
 
