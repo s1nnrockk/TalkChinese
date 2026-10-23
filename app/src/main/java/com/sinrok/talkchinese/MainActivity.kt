@@ -478,14 +478,26 @@ private fun DragonMascot(size: Int) {
 }
 
 private fun configureChineseVoice(tts: TextToSpeech): Boolean {
-    val chineseVoices = runCatching {
-        tts.voices.orEmpty().filter { it.locale.language == "zh" && it.locale.country in setOf("CN", "") }
-    }.getOrDefault(emptyList())
-    val preferredVoice = chineseVoices.filterNot { it.isNetworkConnectionRequired }.maxByOrNull { it.quality }
-        ?: chineseVoices.maxByOrNull { it.quality }
-    if (preferredVoice != null) runCatching { tts.voice = preferredVoice }
+    // Set the locale first: setLanguage() can reset a voice selected before it.
     val result = tts.setLanguage(Locale.SIMPLIFIED_CHINESE)
-    return result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) return false
+
+    val chineseVoices = runCatching {
+        tts.voices.orEmpty().filter {
+            it.locale.language == "zh" && it.locale.country in setOf("CN", "")
+        }
+    }.getOrDefault(emptyList())
+
+    // Prefer a high-quality Simplified Chinese voice; prefer offline only when quality ties.
+    val preferredVoice = chineseVoices.maxWithOrNull(
+        compareBy<android.speech.tts.Voice> { it.quality }
+            .thenBy { if (it.isNetworkConnectionRequired) 0 else 1 }
+    )
+    if (preferredVoice != null) {
+        val applied = runCatching { tts.voice = preferredVoice }.isSuccess
+        if (!applied) return false
+    }
+    return true
 }
 
 @Composable
