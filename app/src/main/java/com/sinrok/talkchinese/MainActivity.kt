@@ -1511,6 +1511,7 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
 
 @Composable
 private fun AccountsScreen(email: String, onLogout: () -> Unit) {
+    val isPlaytester = email.trim().equals("nikitakochnev686@gmail.com", ignoreCase = true)
     val displayName = email.substringBefore("@").replace(".", " ").replace("_", " ")
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -1526,7 +1527,25 @@ private fun AccountsScreen(email: String, onLogout: () -> Unit) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(displayName.ifBlank { "Ученик TalkChinese" }, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                     Text(email, color = Muted, fontSize = 12.sp)
-                    Text("Участник TalkChinese", color = Lacquer, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    if (isPlaytester) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFFFFE7B0),
+                            contentColor = Color(0xFF704A0A),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.9f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text("🧪", fontSize = 12.sp)
+                                Text("Плейтестер", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Участник TalkChinese", color = Lacquer, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
