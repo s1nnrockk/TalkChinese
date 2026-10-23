@@ -1206,7 +1206,22 @@ private fun LessonsScreen(context: Context) {
                                 prefs.edit().putStringSet("completed_lessons", done).apply()
                                 val count = if (prefs.getString("daily_date", "") == today) prefs.getInt("daily_count", 0) else 0
                                 dailyCount = count + 1
-                                prefs.edit().putString("daily_date", today).putInt("daily_count", dailyCount).apply()
+                                val yesterday = java.time.LocalDate.now().minusDays(1).toString()
+                                val previousDay = prefs.getString("last_learning_day", "")
+                                val currentStreak = prefs.getInt("learning_streak", 0)
+                                val nextStreak = when (previousDay) {
+                                    today -> currentStreak.coerceAtLeast(1)
+                                    yesterday -> currentStreak + 1
+                                    else -> 1
+                                }
+                                val xp = prefs.getInt("learning_xp", 0) + 10
+                                prefs.edit()
+                                    .putString("daily_date", today)
+                                    .putInt("daily_count", dailyCount)
+                                    .putString("last_learning_day", today)
+                                    .putInt("learning_streak", nextStreak)
+                                    .putInt("learning_xp", xp)
+                                    .apply()
                             }
                             index = pos + 1
                             prefs.edit().putInt("lesson_index", index).apply()
