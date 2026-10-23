@@ -822,9 +822,9 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                                 .background(
                                     if (active) Brush.linearGradient(
                                         listOf(
-                                            Color(0xFFFFE5D6).copy(alpha = 0.98f),
-                                            Color(0xFFF1C7B7).copy(alpha = 0.92f),
-                                            Color(0xFFE8B8A9).copy(alpha = 0.96f)
+                                            Color(0xFFFFF0C2).copy(alpha = 0.98f),
+                                            Color(0xFFE8C77D).copy(alpha = 0.90f),
+                                            Color(0xFFD9A95E).copy(alpha = 0.94f)
                                         )
                                     ) else Brush.verticalGradient(
                                         listOf(
@@ -838,7 +838,7 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                                     brush = Brush.verticalGradient(
                                         listOf(
                                             Color.White.copy(alpha = if (active) 1f else 0.82f),
-                                            if (active) Color(0xFFCB8F7D).copy(alpha = 0.78f)
+                                            if (active) Color(0xFFB67A39).copy(alpha = 0.78f)
                                             else Color(0xFFDCCBC5).copy(alpha = 0.46f)
                                         )
                                     ),
@@ -926,12 +926,19 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("你好， привет!", color = Lacquer, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("你好 · Nǐ hǎo", color = Lacquer, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Surface(shape = RoundedCornerShape(7.dp), color = Lacquer) {
+                        Text("早", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = Gold, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
                 Text("Продолжим учиться?", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                Text(email, color = Muted, fontSize = 12.sp)
+                Text("每天进步一点点 · Маленький шаг каждый день", color = Muted, fontSize = 11.sp)
+                Text(email, color = Muted.copy(alpha = 0.9f), fontSize = 11.sp)
             }
-            DragonMascot(70)
+            DragonMascot(76)
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -939,13 +946,32 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
             color = Lacquer,
             shadowElevation = 9.dp
         ) {
-            Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF9F2635), DeepRed))).padding(22.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.fillMaxWidth()
+                    .background(Brush.linearGradient(listOf(Color(0xFF9F2635), DeepRed)))
+            ) {
+                Text(
+                    "福",
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 17.dp),
+                    color = Gold.copy(alpha = 0.12f),
+                    fontSize = 112.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "云 · 山 · 龙",
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 10.dp),
+                    color = Paper.copy(alpha = 0.24f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         Icon(Icons.Default.Whatshot, null, tint = Gold)
-                        Text("ТВОЙ КИТАЙСКИЙ ПУТЬ", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                        Text("汉语之旅 · ТВОЙ КИТАЙСКИЙ ПУТЬ", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
                     }
                     Text("Маленький шаг.\nБольшой прогресс.", color = Paper, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("学而时习之 · Учись и повторяй", color = Gold.copy(alpha = 0.92f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Text("Осваивай слова, фразы и тона в своём темпе.", color = Paper.copy(alpha = 0.82f), fontSize = 14.sp)
                     Row(
                         Modifier.padding(top = 4.dp).clip(RoundedCornerShape(15.dp))
@@ -972,7 +998,15 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
             completedCount = learningPrefs.getStringSet("completed_lessons", emptySet())?.size ?: 0
             xp = learningPrefs.getInt("learning_xp", completedCount * 10)
         }
-        Text("ТВОЙ ПРОГРЕСС", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("中", color = Lacquer.copy(alpha = 0.8f), fontSize = 19.sp, fontWeight = FontWeight.Black)
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("ТВОЙ ПРОГРЕСС", color = Lacquer, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Text("进步 · Рост день за днём", color = Muted, fontSize = 10.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            Box(Modifier.width(34.dp).height(1.dp).background(Gold))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCard(Modifier.weight(1f), "$dailyCount", "Сегодня", "ответов")
             StatCard(Modifier.weight(1f), "🔥 $streak", "Серия дней", "не теряй ритм")
@@ -991,7 +1025,13 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
                 color = Lacquer, trackColor = SoftRose)
             Text("Цель дня: $dailyCount из $goal ответов", color = Muted, fontSize = 12.sp)
         }
-        Text("ДОСТИЖЕНИЯ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("印", color = Lacquer.copy(alpha = 0.8f), fontSize = 19.sp, fontWeight = FontWeight.Black)
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("ДОСТИЖЕНИЯ", color = Lacquer, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Text("成就 · Твои маленькие победы", color = Muted, fontSize = 10.sp)
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(1f)) { AchievementChip("🌱", "Первый шаг", completedCount >= 1) }
             Box(Modifier.weight(1f)) { AchievementChip("🔥", "3 дня подряд", streak >= 3) }
