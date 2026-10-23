@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.text.Normalizer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.URL
 import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
@@ -183,6 +186,7 @@ private fun TalkChineseApp(context: Context) {
                 }
             )
             else -> MainShell(
+                context = context,
                 email = signedInEmail,
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
@@ -388,6 +392,7 @@ private fun BrandMark(size: Int) {
 
 @Composable
 private fun MainShell(
+    context: Context,
     email: String,
     selectedTab: MainTab,
     onTabSelected: (MainTab) -> Unit,
@@ -407,7 +412,7 @@ private fun MainShell(
         ) {
             when (selectedTab) {
                 MainTab.HOME -> HomeScreen(email)
-                MainTab.SEARCH -> SearchScreen(searchQuery, onSearchQueryChange)
+                MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
                 MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
                 MainTab.SETTINGS -> SettingsScreen(email, onLogout)
             }
@@ -679,34 +684,157 @@ private fun StatCard(modifier: Modifier, headline: String, title: String, detail
     }
 }
 
+private data class DictionaryEntry(
+    val hanzi: String,
+    val pinyin: String,
+    val russian: List<String>,
+    val english: List<String>,
+    val level: Int
+)
+
+private fun readDictionary(context: Context): List<DictionaryEntry> {
+    val raw = context.assets.open("hsk.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
+    val array = org.json.JSONArray(raw)
+    return buildList(array.length()) {
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val translations = item.optJSONObject("translations")
+            fun readTerms(key: String): List<String> {
+                val value = translations?.opt(key) ?: return emptyList()
+                return when (value) {
+                    is org.json.JSONArray -> (0 until value.length()).mapNotNull { i ->
+                        value.optString(i).takeIf { it.isNotBlank() }
+                    }
+                    is String -> listOf(value).filter { it.isNotBlank() }
+                    else -> emptyList()
+                }
+            }
+            val hanzi = item.optString("hanzi").trim()
+            if (hanzi.isBlank()) continue
+            add(
+                DictionaryEntry(
+                    hanzi = hanzi,
+                    pinyin = item.optString("pinyin").trim(),
+                    russian = readTerms("rus"),
+                    english = readTerms("eng"),
+                    level = item.optInt("level", 0)
+                )
+            )
+        }
+    }
+}
+
+private fun normalizeDictionaryQuery(value: String): String {
+    return Normalizer.normalize(value.lowercase().replace('ü', 'v'), Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+        .replace("u:", "v")
+        .replace(Regex("[\\s'-]+"), "")
+}
+
 @Composable
-private fun SearchScreen(query: String, onQueryChange: (String) -> Unit) {
+private fun SearchScreen(context: Context, query: String, onQueryChange: (String) -> Unit) {
+    var entries by remember { mutableStateOf<List<DictionaryEntry>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(context) {
+        val loaded = withContext(Dispatchers.IO) { runCatching { readDictionary(context) } }
+        entries = loaded.getOrDefault(emptyList())
+        loadError = loaded.isFailure
+        loading = false
+    }
+
+    val normalizedQuery = remember(query) { normalizeDictionaryQuery(query.trim()) }
+    val results = remember(entries, normalizedQuery) {
+        if (normalizedQuery.isBlank()) emptyList() else entries.asSequence()
+            .filter { entry ->
+                normalizeDictionaryQuery(entry.hanzi).contains(normalizedQuery) ||
+                    normalizeDictionaryQuery(entry.pinyin).contains(normalizedQuery) ||
+                    entry.russian.any { normalizeDictionaryQuery(it).contains(normalizedQuery) } ||
+                    entry.english.any { normalizeDictionaryQuery(it).contains(normalizedQuery) }
+            }
+            .sortedWith(
+                compareBy<DictionaryEntry> {
+                    when {
+                        normalizeDictionaryQuery(it.hanzi) == normalizedQuery -> 0
+                        normalizeDictionaryQuery(it.pinyin) == normalizedQuery -> 1
+                        it.hanzi.startsWith(query.trim()) -> 2
+                        else -> 3
+                    }
+                }.thenBy { it.hanzi.length }
+            )
+            .take(100)
+            .toList()
+    }
+
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Поиск", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Найди слово или тему для изучения.", color = Muted, fontSize = 14.sp)
+        Text("Словарь", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Ищи по иероглифам, пиньиню или русскому переводу.", color = Muted, fontSize = 14.sp)
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(Icons.Default.Search, null, tint = Lacquer) },
-            placeholder = { Text("Например, 你好 или приветствие") },
+            placeholder = { Text("你好 · nǐ hǎo · привет") },
             singleLine = true,
             shape = RoundedCornerShape(18.dp)
         )
-        Surface(shape = RoundedCornerShape(22.dp), color = CardWhite, shadowElevation = 3.dp) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(if (query.isBlank()) "Попробуй начать с этих тем" else "Поиск по словарю", color = Lacquer, fontWeight = FontWeight.Bold)
-                Text("• Приветствия и знакомство", color = Ink, fontSize = 14.sp)
-                Text("• Числа и время", color = Ink, fontSize = 14.sp)
-                Text("• Путешествия и повседневные фразы", color = Ink, fontSize = 14.sp)
-                if (query.isNotBlank()) {
-                    Text("Полнотекстовый поиск по словарю подключим вместе с каталогом уроков.", color = Muted, fontSize = 12.sp)
+
+        when {
+            loading -> Row(
+                Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(color = Lacquer, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+                Text("Загружаем словарь…", color = Muted, fontSize = 13.sp)
+            }
+            loadError -> Surface(shape = RoundedCornerShape(20.dp), color = CardWhite) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Не удалось открыть словарь", color = Lacquer, fontWeight = FontWeight.Bold)
+                    Text("Проверь, что сборка содержит словарь HSK. Пересобери APK через GitHub Actions с подключением к интернету.", color = Muted, fontSize = 13.sp)
+                }
+            }
+            query.isBlank() -> Surface(shape = RoundedCornerShape(22.dp), color = CardWhite, shadowElevation = 2.dp) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Китайско-русский словарь HSK", color = Lacquer, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("В базе — слова всех 6 уровней HSK с пиньинем и переводом на русский.", color = Ink, fontSize = 14.sp)
+                    Text("Попробуй: 爱, 学习, 你好, ài или xuexi.", color = Muted, fontSize = 13.sp)
+                    Text("${entries.size} слов доступно офлайн", color = Lacquer, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Источник данных: LiudmilaLV/json_hsk · см. лицензию источника.", color = Muted, fontSize = 10.sp)
+                }
+            }
+            results.isEmpty() -> Surface(shape = RoundedCornerShape(20.dp), color = CardWhite) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Ничего не найдено", color = Lacquer, fontWeight = FontWeight.Bold)
+                    Text("Попробуй другой иероглиф, пиньинь без тонов или перевод.", color = Muted, fontSize = 13.sp)
+                }
+            }
+            else -> {
+                Text("Найдено: ${results.size}${if (results.size == 100) "+" else ""}", color = Muted, fontSize = 12.sp)
+                results.forEach { entry ->
+                    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = CardWhite, shadowElevation = 2.dp) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(entry.hanzi, color = Lacquer, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(entry.pinyin.ifBlank { "Пиньинь не указан" }, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    if (entry.level > 0) Text("HSK ${entry.level}", color = Muted, fontSize = 10.sp)
+                                }
+                            }
+                            if (entry.russian.isNotEmpty()) Text(entry.russian.joinToString(" · "), color = Ink, fontSize = 14.sp)
+                            if (entry.english.isNotEmpty()) Text(entry.english.take(3).joinToString(" · "), color = Muted, fontSize = 12.sp)
+                        }
+                    }
                 }
             }
         }
+        Text("Словарь работает без интернета после установки. Это полный набор слов HSK в источнике, а не все существующие китайские слова.", color = Muted, fontSize = 11.sp)
     }
 }
 
