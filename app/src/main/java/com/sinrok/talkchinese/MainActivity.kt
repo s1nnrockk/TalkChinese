@@ -921,10 +921,32 @@ private fun tabIcon(tab: MainTab) = when (tab) {
 
 @Composable
 private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(
+                listOf(Color(0xFFFFF8EB), Color(0xFFFFF0E1), Color(0xFFF4E4D9), Color(0xFFFFF8EB))
+            )
+        )
     ) {
+        // Restrained ink-wash accents behind the content, kept translucent so the UI stays readable.
+        Box(
+            Modifier.align(Alignment.TopEnd).offset(x = 48.dp, y = 16.dp).size(190.dp)
+                .background(
+                    Brush.radialGradient(listOf(Color(0xFFD8B56D).copy(alpha = 0.20f), Color.Transparent)),
+                    CircleShape
+                )
+        )
+        Box(
+            Modifier.align(Alignment.CenterStart).offset(x = (-76).dp, y = 100.dp).size(170.dp)
+                .background(
+                    Brush.radialGradient(listOf(Color(0xFF8E1725).copy(alpha = 0.07f), Color.Transparent)),
+                    CircleShape
+                )
+        )
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -938,18 +960,46 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
                 Text("每天进步一点点 · Маленький шаг каждый день", color = Muted, fontSize = 11.sp)
                 Text(email, color = Muted.copy(alpha = 0.9f), fontSize = 11.sp)
             }
-            DragonMascot(76)
+            Box(
+                Modifier.size(92.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    Modifier.size(92.dp).background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFFFFD98A).copy(alpha = 0.42f), Color(0xFF8E1725).copy(alpha = 0.05f), Color.Transparent)
+                        ),
+                        CircleShape
+                    )
+                )
+                DragonMascot(76)
+            }
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             color = Lacquer,
-            shadowElevation = 9.dp
+            border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.72f)),
+            shadowElevation = 12.dp
         ) {
             Box(
                 Modifier.fillMaxWidth()
-                    .background(Brush.linearGradient(listOf(Color(0xFF9F2635), DeepRed)))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFFB33340), Color(0xFF761522), DeepRed)
+                        )
+                    )
             ) {
+                Box(
+                    Modifier.fillMaxWidth().height(1.dp).align(Alignment.TopCenter)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFFFF4D2).copy(alpha = 0.95f), Color.Transparent)))
+                )
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 20.dp)
+                        .size(84.dp).border(1.dp, Gold.copy(alpha = 0.25f), CircleShape)
+                ) {
+                    Box(Modifier.fillMaxSize().padding(8.dp).border(1.dp, Gold.copy(alpha = 0.16f), CircleShape))
+                }
                 Text(
                     "福",
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 17.dp),
@@ -1056,6 +1106,7 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
             }
         }
         Text("Каждое слово словаря становится отдельным уроком с объяснением и практикой.", color = Muted, fontSize = 12.sp)
+        }
     }
 }
 
