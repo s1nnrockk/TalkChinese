@@ -916,10 +916,43 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
                 }
             }
         }
-        Text("ТВОЙ ПЛАН", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(Modifier.weight(1f), "今日", "Сегодня", "Учись в своём темпе")
-            StatCard(Modifier.weight(1f), "汉字", "Новые слова", "Пополняй словарь")
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val learningPrefs = remember(context) { context.getSharedPreferences("talkchinese_learning", Context.MODE_PRIVATE) }
+        var dailyCount by remember { mutableIntStateOf(0) }
+        var streak by remember { mutableIntStateOf(0) }
+        var completedCount by remember { mutableIntStateOf(0) }
+        var xp by remember { mutableIntStateOf(0) }
+        val todayKey = remember { java.time.LocalDate.now().toString() }
+        LaunchedEffect(context) {
+            dailyCount = if (learningPrefs.getString("daily_date", "") == todayKey) learningPrefs.getInt("daily_count", 0) else 0
+            streak = learningPrefs.getInt("learning_streak", 0)
+            completedCount = learningPrefs.getStringSet("completed_lessons", emptySet())?.size ?: 0
+            xp = learningPrefs.getInt("learning_xp", completedCount * 10)
+        }
+        Text("ТВОЙ ПРОГРЕСС", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCard(Modifier.weight(1f), "$dailyCount", "Сегодня", "ответов")
+            StatCard(Modifier.weight(1f), "🔥 $streak", "Серия дней", "не теряй ритм")
+        }
+        GlassLessonCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Твой путь", color = Lacquer, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    Text("$completedCount слов изучено · $xp XP", color = Muted, fontSize = 12.sp)
+                }
+                BrandMark(48)
+            }
+            val goal = 10
+            val progress = (dailyCount.toFloat() / goal).coerceIn(0f, 1f)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                color = Lacquer, trackColor = SoftRose)
+            Text("Цель дня: $dailyCount из $goal ответов", color = Muted, fontSize = 12.sp)
+        }
+        Text("ДОСТИЖЕНИЯ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.weight(1f)) { AchievementChip("🌱", "Первый шаг", completedCount >= 1) }
+            Box(Modifier.weight(1f)) { AchievementChip("🔥", "3 дня подряд", streak >= 3) }
+            Box(Modifier.weight(1f)) { AchievementChip("🏆", "100 XP", xp >= 100) }
         }
         Surface(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onStartLearning),
@@ -940,6 +973,22 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
             }
         }
         Text("Каждое слово словаря становится отдельным уроком с объяснением и практикой.", color = Muted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun AchievementChip(emoji: String, title: String, unlocked: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = if (unlocked) Color(0xFFFFF0D1).copy(alpha = 0.88f) else Color.White.copy(alpha = 0.52f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (unlocked) Gold.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.9f))
+    ) {
+        Column(Modifier.padding(vertical = 12.dp, horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(if (unlocked) emoji else "🔒", fontSize = 20.sp)
+            Text(title, color = if (unlocked) Lacquer else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(if (unlocked) "Открыто" else "Впереди", color = Muted, fontSize = 9.sp)
+        }
     }
 }
 
@@ -1296,9 +1345,9 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
             .sortedWith(
                 compareBy<DictionarySearchItem> {
                     when {
-                        item.hanziKey == normalizedQuery -> 0
-                        item.pinyinKey == normalizedQuery -> 1
-                        item.entry.hanzi.startsWith(query.trim()) -> 2
+                        it.hanziKey == normalizedQuery -> 0
+                        it.pinyinKey == normalizedQuery -> 1
+                        it.entry.hanzi.startsWith(query.trim()) -> 2
                         else -> 3
                     }
                 }.thenBy { it.entry.hanzi.length }
