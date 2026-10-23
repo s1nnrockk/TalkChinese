@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -550,11 +551,26 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
+                                val iconSize by animateDpAsState(
+                                    targetValue = if (active) 24.dp else 21.dp,
+                                    animationSpec = spring(dampingRatio = 0.30f, stiffness = 320f),
+                                    label = "liquidIconSize"
+                                )
+                                val iconTint by animateColorAsState(
+                                    targetValue = if (active) Lacquer else Muted,
+                                    animationSpec = spring(dampingRatio = 0.78f, stiffness = 460f),
+                                    label = "liquidIconTint"
+                                )
+                                val iconBounce by animateFloatAsState(
+                                    targetValue = if (active) 1.08f else 1f,
+                                    animationSpec = spring(dampingRatio = 0.24f, stiffness = 300f),
+                                    label = "liquidIconBounce"
+                                )
                                 Icon(
                                     imageVector = tabIcon(tab),
                                     contentDescription = tab.title,
-                                    tint = if (active) Lacquer else Muted,
-                                    modifier = Modifier.size(if (active) 23.dp else 21.dp)
+                                    tint = iconTint,
+                                    modifier = Modifier.size(iconSize).scale(iconBounce)
                                 )
                                 AnimatedVisibility(
                                     visible = active,
