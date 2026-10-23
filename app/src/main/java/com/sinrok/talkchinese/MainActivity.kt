@@ -982,6 +982,13 @@ private fun GlassLessonCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+private fun normalizeDictionaryQuery(value: String): String {
+    return Normalizer.normalize(value.lowercase().replace('ü', 'v'), Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+        .replace("u:", "v")
+        .replace(Regex("[\\s'-]+"), "")
+}
+
 @Composable
 private fun SearchScreen(context: Context, query: String, onQueryChange: (String) -> Unit) {
     var entries by remember { mutableStateOf<List<DictionaryEntry>>(emptyList()) }
