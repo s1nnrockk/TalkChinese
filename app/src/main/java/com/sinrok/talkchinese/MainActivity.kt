@@ -67,7 +67,7 @@ private val SoftRose = Color(0xFFF4E2DD)
 private val AuthExecutor = Executors.newSingleThreadExecutor()
 
 private enum class MainTab(val title: String) {
-    HOME("Главная"), SEARCH("Поиск"), ACCOUNTS("Аккаунты"), SETTINGS("Настройки")
+    HOME("Главная"), LEARN("Уроки"), SEARCH("Поиск"), ACCOUNTS("Аккаунты"), SETTINGS("Настройки")
 }
 
 class MainActivity : ComponentActivity() {
@@ -411,7 +411,8 @@ private fun MainShell(
                 .background(Brush.verticalGradient(listOf(Paper, Color(0xFFFFF2E4))))
         ) {
             when (selectedTab) {
-                MainTab.HOME -> HomeScreen(email)
+                MainTab.HOME -> HomeScreen(email, onStartLearning = { onTabSelected(MainTab.LEARN) })
+                MainTab.LEARN -> LessonsScreen(context)
                 MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
                 MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
                 MainTab.SETTINGS -> SettingsScreen(email, onLogout)
@@ -601,13 +602,14 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
 
 private fun tabIcon(tab: MainTab) = when (tab) {
     MainTab.HOME -> Icons.Default.Home
+    MainTab.LEARN -> Icons.Default.Book
     MainTab.SEARCH -> Icons.Default.Search
     MainTab.ACCOUNTS -> Icons.Default.Person
     MainTab.SETTINGS -> Icons.Default.Settings
 }
 
 @Composable
-private fun HomeScreen(email: String) {
+private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -636,7 +638,7 @@ private fun HomeScreen(email: String) {
                     Text("Осваивай слова, фразы и тона в своём темпе.", color = Paper.copy(alpha = 0.82f), fontSize = 14.sp)
                     Row(
                         Modifier.padding(top = 4.dp).clip(RoundedCornerShape(15.dp))
-                            .background(Gold).padding(horizontal = 15.dp, vertical = 10.dp),
+                            .background(Gold).clickable(onClick = onStartLearning).padding(horizontal = 15.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Начать обучение", color = DeepRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -652,7 +654,7 @@ private fun HomeScreen(email: String) {
             StatCard(Modifier.weight(1f), "汉字", "Новые слова", "Пополняй словарь")
         }
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onStartLearning),
             shape = RoundedCornerShape(24.dp),
             color = CardWhite,
             shadowElevation = 3.dp
@@ -669,7 +671,7 @@ private fun HomeScreen(email: String) {
                 Icon(Icons.Default.ArrowForward, null, tint = Lacquer)
             }
         }
-        Text("Дизайн и навигация готовы к следующему этапу уроков.", color = Muted, fontSize = 12.sp)
+        Text("Каждое слово словаря становится отдельным уроком с объяснением и практикой.", color = Muted, fontSize = 12.sp)
     }
 }
 
@@ -680,6 +682,136 @@ private fun StatCard(modifier: Modifier, headline: String, title: String, detail
             Text(headline, color = Lacquer, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             Text(title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Text(detail, color = Muted, fontSize = 11.sp)
+        }
+    }
+}
+
+
+private fun normalizeLearningAnswer(value: String): String =
+    Normalizer.normalize(value.trim().lowercase().replace('ü', 'v'), Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "").replace("u:", "v").replace(Regex("[\\s'-]+"), "")
+
+@Composable
+private fun LessonsScreen(context: Context) {
+    val prefs = remember(context) { context.getSharedPreferences("talkchinese_learning", Context.MODE_PRIVATE) }
+    var entries by remember { mutableStateOf<List<DictionaryEntry>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var level by remember { mutableIntStateOf(0) }
+    var index by remember { mutableIntStateOf(prefs.getInt("lesson_index", 0)) }
+    var done by remember { mutableStateOf(prefs.getStringSet("completed_lessons", emptySet())?.toSet() ?: emptySet()) }
+    var selected by remember { mutableStateOf("") }
+    var typed by remember { mutableStateOf("") }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var correct by remember { mutableStateOf(false) }
+    LaunchedEffect(context) {
+        val result = runCatching { withContext(Dispatchers.IO) { readDictionary(context) } }
+        result.onSuccess { entries = it }.onFailure { failed = true }
+        loading = false
+    }
+    val lessons = remember(entries, level) { if (level == 0) entries else entries.filter { it.level == level } }
+    val pos = if (lessons.isEmpty()) 0 else Math.floorMod(index, lessons.size)
+    val word = lessons.getOrNull(pos)
+    val type = pos % 4
+    val meaning = word?.russian?.firstOrNull()?.takeIf { it.isNotBlank() } ?: word?.english?.firstOrNull().orEmpty()
+    val answer = when (type) { 0 -> meaning; 1 -> word?.pinyin.orEmpty(); 2 -> word?.hanzi.orEmpty(); else -> word?.pinyin.orEmpty() }
+    val options = remember(lessons, pos, type) {
+        val w = lessons.getOrNull(pos)
+        if (w == null || type == 3) emptyList() else {
+            fun value(e: DictionaryEntry) = when(type) {
+                0 -> e.russian.firstOrNull()?.takeIf { it.isNotBlank() } ?: e.english.firstOrNull().orEmpty()
+                1 -> e.pinyin
+                else -> e.hanzi
+            }
+            val right = value(w)
+            (listOf(right) + lessons.asSequence().filter { it.hanzi != w.hanzi }.map(::value).filter { it.isNotBlank() && it != right }.distinct().take(3))
+                .distinct().sortedBy { it.hashCode() xor w.hanzi.hashCode() }
+        }
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+        Text("Уроки и практика", color = Ink, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Объяснения, задания и сохранение прогресса.", color = Muted, fontSize = 13.sp)
+        Surface(shape = RoundedCornerShape(24.dp), color = DeepRed) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("ТВОЯ ПРОГРАММА", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("${entries.size} уроков по словам", color = Paper, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Четыре формата практики: перевод, пиньинь, распознавание иероглифа и ввод ответа.", color = Paper, fontSize = 13.sp)
+                LinearProgressIndicator(progress = { if (entries.isEmpty()) 0f else (done.size.toFloat()/entries.size).coerceIn(0f,1f) }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = Gold, trackColor = Paper.copy(alpha = .2f))
+                Text("Пройдено: ${done.size} из ${entries.size}", color = Gold, fontSize = 12.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            (0..6).forEach { n ->
+                FilterChip(selected = level == n, onClick = {
+                    level = n; index = 0; prefs.edit().putInt("lesson_index", 0).apply()
+                    selected = ""; typed = ""; feedback = null; correct = false
+                }, label = { Text(if (n == 0) "Все" else "HSK $n", fontSize = 10.sp) }, modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Lacquer, selectedLabelColor = Paper))
+            }
+        }
+        when {
+            loading -> CircularProgressIndicator(color = Lacquer)
+            failed || entries.isEmpty() -> Text("Словарь уроков не загрузился. Проверь сборку APK через GitHub Actions.", color = Lacquer)
+            word != null -> {
+                Surface(shape = RoundedCornerShape(25.dp), color = CardWhite, shadowElevation = 3.dp) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("УРОК ${pos+1}", color = Lacquer, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                            Spacer(Modifier.weight(1f)); Text("HSK ${word.level}", color = Muted, fontSize = 11.sp)
+                        }
+                        Text(word.hanzi, color = Lacquer, fontSize = 46.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(word.pinyin, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                        Text(meaning.ifBlank { "Перевод не указан" }, color = Lacquer, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        if (word.russian.size > 1) Text("Другие значения: ${word.russian.drop(1).take(4).joinToString(" · ")}", color = Muted, fontSize = 12.sp)
+                        HorizontalDivider(color = SoftRose)
+                        Text("ОБЪЯСНЕНИЕ", color = Lacquer, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                        Text("Запомни связку: ${word.hanzi} → ${word.pinyin} → ${meaning}. Пиньинь показывает произношение латинскими буквами, а надстрочные знаки отмечают тоны — они важны для правильного китайского произношения.", color = Ink, fontSize = 14.sp)
+                        Text("Учись в три шага: узнай иероглиф, вспомни произношение, затем назови значение без подсказки. Упражнение ниже проверит одну из этих связей.", color = Muted, fontSize = 12.sp)
+                    }
+                }
+                Surface(shape = RoundedCornerShape(25.dp), color = CardWhite, shadowElevation = 3.dp) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("ПРОВЕРЬ СЕБЯ", color = Lacquer, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(when(type) {
+                            0 -> "Что означает «${word.hanzi}»?"
+                            1 -> "Выбери пиньинь для «${word.hanzi}»."
+                            2 -> "Какой иероглиф означает «${meaning}»?"
+                            else -> "Введи пиньинь слова «${word.hanzi}»."
+                        }, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        if (type == 3) {
+                            OutlinedTextField(value = typed, onValueChange = { typed = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Пиньинь") }, placeholder = { Text("Например: ni hao") }, shape = RoundedCornerShape(15.dp))
+                            Button(onClick = {
+                                correct = normalizeLearningAnswer(typed) == normalizeLearningAnswer(answer)
+                                feedback = if (correct) "Верно! Ты вспомнил произношение без вариантов." else "Не совпало. Проверь пиньинь в карточке и попробуй ещё раз."
+                            }, enabled = typed.isNotBlank() && feedback == null, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Lacquer)) { Text("Проверить ответ") }
+                        } else options.forEach { option ->
+                            OutlinedButton(onClick = {
+                                selected = option; correct = option == answer
+                                feedback = if (correct) "Верно! ${word.hanzi} — ${meaning}; пиньинь: ${word.pinyin}." else "Пока нет. Правильный ответ: ${answer}. Перечитай объяснение и попробуй ещё раз."
+                            }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(containerColor = if (selected == option && correct) Color(0xFFE2F2E5) else if (selected == option) SoftRose else CardWhite, contentColor = Ink)) {
+                                Text(option, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                            }
+                        }
+                        feedback?.let { note ->
+                            Surface(shape = RoundedCornerShape(15.dp), color = if (correct) Color(0xFFE5F3E7) else SoftRose) { Text(note, Modifier.fillMaxWidth().padding(13.dp), color = Ink, fontSize = 13.sp) }
+                            Button(onClick = {
+                                if (correct) {
+                                    val id = "${word.hanzi}|${word.pinyin}"
+                                    val updated = done + id
+                                    done = updated
+                                    prefs.edit().putStringSet("completed_lessons", updated).apply()
+                                    index = pos + 1; prefs.edit().putInt("lesson_index", index).apply()
+                                }
+                                selected = ""; typed = ""; feedback = null; correct = false
+                            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if (correct) Lacquer else Muted)) {
+                                Text(if (correct) "Следующий урок →" else "Попробовать ещё раз")
+                            }
+                        }
+                    }
+                }
+                Text("Ошибки не увеличивают прогресс. Повтори слово, пока не вспомнишь его самостоятельно.", color = Muted, fontSize = 12.sp)
+            }
         }
     }
 }
