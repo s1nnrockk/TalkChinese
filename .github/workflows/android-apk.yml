@@ -37,6 +37,24 @@ jobs:
           test -n "$SUPABASE_ANON_KEY" || { echo "::error::Missing repository secret SUPABASE_ANON_KEY"; exit 1; }
           echo "Supabase configuration secrets are present; values are not displayed."
 
+      - name: Download and validate Chinese-Russian HSK dictionary
+        run: |
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 --retry-delay 2 \
+            https://raw.githubusercontent.com/LiudmilaLV/json_hsk/master/hsk.json \
+            --output app/src/main/assets/hsk.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("app/src/main/assets/hsk.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          if len(data) < 4000:
+              raise SystemExit(f"Dictionary looks incomplete: only {len(data)} entries")
+          if not all("hanzi" in row and "pinyin" in row and "translations" in row for row in data[:20]):
+              raise SystemExit("Dictionary schema validation failed")
+          print(f"Validated {len(data)} HSK dictionary entries")
+          PY
+
       - name: Build debug APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
