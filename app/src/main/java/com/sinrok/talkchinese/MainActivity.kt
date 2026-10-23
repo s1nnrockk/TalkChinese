@@ -420,26 +420,18 @@ private fun DragonMascot(size: Int) {
         animationSpec = infiniteRepeatable(animation = tween(1850), repeatMode = RepeatMode.Reverse),
         label = "dragonFloat"
     )
-    val tilt by motion.animateFloat(
-        initialValue = -3.2f, targetValue = 3.2f,
-        animationSpec = infiniteRepeatable(animation = tween(2600), repeatMode = RepeatMode.Reverse),
-        label = "dragonTilt"
-    )
+    // Two motion tracks keep the mascot lively without running four perpetual animations.
     val yaw by motion.animateFloat(
-        initialValue = -5f, targetValue = 5f,
+        initialValue = -4f, targetValue = 4f,
         animationSpec = infiniteRepeatable(animation = tween(3200), repeatMode = RepeatMode.Reverse),
         label = "dragonPerspective"
     )
-    val glow by motion.animateFloat(
-        initialValue = 0.28f, targetValue = 0.72f,
-        animationSpec = infiniteRepeatable(animation = tween(1450), repeatMode = RepeatMode.Reverse),
-        label = "dragonGoldGlow"
-    )
+    val glow = 0.58f
     Box(
         Modifier.size(size.dp)
             .graphicsLayer {
                 translationY = bob
-                rotationZ = tilt
+                rotationZ = yaw * 0.38f
                 rotationY = yaw
                 rotationX = -yaw * 0.42f
                 cameraDistance = 18f * density
@@ -449,12 +441,12 @@ private fun DragonMascot(size: Int) {
             }
             .background(
                 Brush.radialGradient(
-                    listOf(Color(0xFFFFF0C5).copy(alpha = glow), Color(0xFFB72B3A), Color(0xFF350B13))
+                    listOf(Color(0xFFFFF0C5).copy(alpha = 0.58f), Color(0xFFB72B3A), Color(0xFF350B13))
                 ),
                 RoundedCornerShape((size * 0.34f).dp)
             )
             .border(1.4.dp, Brush.linearGradient(
-                listOf(Color.White.copy(alpha = 0.96f), Gold.copy(alpha = glow), Color(0xFF8D5B2A))
+                listOf(Color.White.copy(alpha = 0.96f), Gold.copy(alpha = 0.68f), Color(0xFF8D5B2A))
             ), RoundedCornerShape((size * 0.34f).dp))
             .padding(3.dp)
     ) {
@@ -476,7 +468,7 @@ private fun DragonMascot(size: Int) {
                 .align(Alignment.TopCenter)
                 .clip(CircleShape)
                 .background(Brush.horizontalGradient(
-                    listOf(Color.Transparent, Color.White.copy(alpha = glow), Color.Transparent)
+                    listOf(Color.Transparent, Color.White.copy(alpha = 0.68f), Color.Transparent)
                 ))
         )
     }
@@ -490,11 +482,7 @@ private fun ChineseAudioButton(hanzi: String, pinyin: String) {
     val tts = remember(context) {
         TextToSpeech(context.applicationContext) { status ->
             ready = status == TextToSpeech.SUCCESS
-            if (status == TextToSpeech.SUCCESS) {
-                val result = ttsLocaleSafe()
-                // The locale is applied in the click handler as well, in case the engine
-                // finishes initialization after the screen has been composed.
-            } else {
+            if (status != TextToSpeech.SUCCESS) {
                 failed = true
             }
         }
@@ -527,7 +515,6 @@ private fun ChineseAudioButton(hanzi: String, pinyin: String) {
     }
 }
 
-private fun ttsLocaleSafe(): Locale = Locale.SIMPLIFIED_CHINESE
 
 
 private data class DialogueLine(val speaker: Int, val hanzi: String, val pinyin: String, val russian: String)
@@ -1257,6 +1244,14 @@ private fun readDictionaryUncached(context: Context): List<DictionaryEntry> {
     }
 }
 
+private data class DictionarySearchItem(
+    val entry: DictionaryEntry,
+    val hanziKey: String,
+    val pinyinKey: String,
+    val russianKey: String,
+    val englishKey: String
+)
+
 private fun normalizeDictionaryQuery(value: String): String {
     return Normalizer.normalize(value.lowercase().replace('ü', 'v'), Normalizer.Form.NFD)
         .replace(Regex("\\p{M}+"), "")
@@ -1278,25 +1273,38 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
     }
 
     val normalizedQuery = remember(query) { normalizeDictionaryQuery(query.trim()) }
-    val results = remember(entries, normalizedQuery) {
-        if (normalizedQuery.isBlank()) emptyList() else entries.asSequence()
-            .filter { entry ->
-                normalizeDictionaryQuery(entry.hanzi).contains(normalizedQuery) ||
-                    normalizeDictionaryQuery(entry.pinyin).contains(normalizedQuery) ||
-                    entry.russian.any { normalizeDictionaryQuery(it).contains(normalizedQuery) } ||
-                    entry.english.any { normalizeDictionaryQuery(it).contains(normalizedQuery) }
+    // Normalize each dictionary entry only when the dictionary loads, not on every keystroke.
+    val searchIndex = remember(entries) {
+        entries.map { entry ->
+            DictionarySearchItem(
+                entry = entry,
+                hanziKey = normalizeDictionaryQuery(entry.hanzi),
+                pinyinKey = normalizeDictionaryQuery(entry.pinyin),
+                russianKey = normalizeDictionaryQuery(entry.russian.joinToString(" ")),
+                englishKey = normalizeDictionaryQuery(entry.english.joinToString(" "))
+            )
+        }
+    }
+    val results = remember(searchIndex, normalizedQuery, query) {
+        if (normalizedQuery.isBlank()) emptyList() else searchIndex.asSequence()
+            .filter { item ->
+                item.hanziKey.contains(normalizedQuery) ||
+                    item.pinyinKey.contains(normalizedQuery) ||
+                    item.russianKey.contains(normalizedQuery) ||
+                    item.englishKey.contains(normalizedQuery)
             }
             .sortedWith(
-                compareBy<DictionaryEntry> {
+                compareBy<DictionarySearchItem> {
                     when {
-                        normalizeDictionaryQuery(it.hanzi) == normalizedQuery -> 0
-                        normalizeDictionaryQuery(it.pinyin) == normalizedQuery -> 1
-                        it.hanzi.startsWith(query.trim()) -> 2
+                        item.hanziKey == normalizedQuery -> 0
+                        item.pinyinKey == normalizedQuery -> 1
+                        item.entry.hanzi.startsWith(query.trim()) -> 2
                         else -> 3
                     }
-                }.thenBy { it.hanzi.length }
+                }.thenBy { it.entry.hanzi.length }
             )
             .take(100)
+            .map { it.entry }
             .toList()
     }
 
