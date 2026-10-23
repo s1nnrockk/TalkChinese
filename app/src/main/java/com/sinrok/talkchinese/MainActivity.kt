@@ -713,6 +713,8 @@ private fun normalizeLearningAnswer(value: String): String =
 
 @Composable
 private fun LessonsScreen(context: Context) {
+    val uiPrefs = remember(context) { context.getSharedPreferences("talkchinese_ui_settings", Context.MODE_PRIVATE) }
+    val showPinyin = remember(context) { uiPrefs.getBoolean("show_pinyin", true) }
     val prefs = remember(context) { context.getSharedPreferences("talkchinese_learning", Context.MODE_PRIVATE) }
     var entries by remember { mutableStateOf<List<DictionaryEntry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -780,7 +782,7 @@ private fun LessonsScreen(context: Context) {
                             Spacer(Modifier.weight(1f)); Text("HSK ${word.level}", color = Muted, fontSize = 11.sp)
                         }
                         Text(word.hanzi, color = Lacquer, fontSize = 46.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(word.pinyin, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                        if (showPinyin) Text(word.pinyin, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
                         Text(meaning.ifBlank { "Перевод не указан" }, color = Lacquer, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         if (word.russian.size > 1) Text("Другие значения: ${word.russian.drop(1).take(4).joinToString(" · ")}", color = Muted, fontSize = 12.sp)
                         HorizontalDivider(color = SoftRose)
@@ -844,7 +846,18 @@ private data class DictionaryEntry(
     val level: Int
 )
 
+@Volatile
+private var cachedDictionary: List<DictionaryEntry>? = null
+
 private fun readDictionary(context: Context): List<DictionaryEntry> {
+    cachedDictionary?.let { return it }
+    return synchronized(DictionaryEntry::class.java) {
+        cachedDictionary?.let { return@synchronized it }
+        readDictionaryUncached(context).also { cachedDictionary = it }
+    }
+}
+
+private fun readDictionaryUncached(context: Context): List<DictionaryEntry> {
     val raw = context.assets.open("hsk.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
     val array = org.json.JSONArray(raw)
     return buildList(array.length()) {
