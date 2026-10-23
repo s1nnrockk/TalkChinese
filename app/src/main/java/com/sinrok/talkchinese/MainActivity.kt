@@ -750,7 +750,7 @@ private fun LessonsScreen(context: Context) {
             }
         }
     }
-    val pos = if (lessons.isEmpty()) 0 else Math.floorMod(index, lessons.size)
+    val pos = if (lessons.isEmpty()) 0 else if (reviewOnly) index.coerceIn(0, lessons.lastIndex) else Math.floorMod(index, lessons.size)
     val word = lessons.getOrNull(pos)
     val type = pos % 4
     val meaning = word?.russian?.firstOrNull()?.takeIf { it.isNotBlank() } ?: word?.english?.firstOrNull().orEmpty()
@@ -769,7 +769,7 @@ private fun LessonsScreen(context: Context) {
                 .distinct().sortedBy { it.hashCode() xor w.hanzi.hashCode() }
         }
     }
-    val completedInLevel = remember(lessons, done) { lessons.count { "${it.hanzi}|${it.pinyin}" in done } }
+    val completedInLevel = remember(lessons, done, reviewOnly, index) { if (reviewOnly) index.coerceIn(0, lessons.size) else lessons.count { "${it.hanzi}|${it.pinyin}" in done } }
     val progress = if (lessons.isEmpty()) 0f else completedInLevel.toFloat() / lessons.size.toFloat()
 
     Column(
@@ -829,9 +829,9 @@ private fun LessonsScreen(context: Context) {
                 Text("Не удалось загрузить словарь", color = Lacquer, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text("Словарь HSK загружается при сборке APK. Проверь последний запуск GitHub Actions и пересобери приложение.", color = Muted, fontSize = 13.sp)
             }
-            reviewOnly && lessons.isEmpty() -> GlassLessonCard {
-                Text("复习完成 · Всё повторено", color = Lacquer, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Сейчас нет слов, которые пора повторить. Новые повторы появятся по расписанию.", color = Muted, fontSize = 14.sp)
+            reviewOnly && (lessons.isEmpty() || index >= lessons.size) -> GlassLessonCard {
+                Text(if (lessons.isEmpty()) "复习完成 · Всё повторено" else "本轮完成 · Раунд завершён", color = Lacquer, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+                Text(if (lessons.isEmpty()) "Сейчас нет слов, которые пора повторить. Новые повторы появятся по расписанию." else "Ты прошёл все слова, доступные для повторения сейчас. Отличная работа!", color = Muted, fontSize = 14.sp)
                 Button(onClick = { reviewOnly = false; index = 0; feedback = null }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Lacquer)) { Text("Учить новые слова") }
             }
             word != null -> {
