@@ -677,15 +677,29 @@ private fun MainShell(
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
-                    (fadeIn(animationSpec = tween(300)) + slideInHorizontally(
-                        animationSpec = tween(420),
-                        initialOffsetX = { fullWidth -> fullWidth / 12 }
-                    ) + scaleIn(animationSpec = tween(360), initialScale = 0.965f)).togetherWith(
-                        fadeOut(animationSpec = tween(190)) + slideOutHorizontally(
-                            animationSpec = tween(300),
-                            targetOffsetX = { fullWidth -> -fullWidth / 22 }
-                        ) + scaleOut(animationSpec = tween(260), targetScale = 1.025f)
-                    )
+                    val movingForward = targetState.ordinal >= initialState.ordinal
+                    (fadeIn(animationSpec = tween(360, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(
+                            animationSpec = tween(460, easing = FastOutSlowInEasing),
+                            initialOffsetX = { fullWidth -> if (movingForward) fullWidth / 9 else -fullWidth / 9 }
+                        ) +
+                        slideInVertically(
+                            animationSpec = tween(420, easing = FastOutSlowInEasing),
+                            initialOffsetY = { height -> height / 70 }
+                        ) +
+                        scaleIn(animationSpec = tween(420, easing = FastOutSlowInEasing), initialScale = 0.94f))
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                                slideOutHorizontally(
+                                    animationSpec = tween(320, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { fullWidth -> if (movingForward) -fullWidth / 16 else fullWidth / 16 }
+                                ) +
+                                slideOutVertically(
+                                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                                    targetOffsetY = { height -> -height / 90 }
+                                ) +
+                                scaleOut(animationSpec = tween(300, easing = FastOutSlowInEasing), targetScale = 1.015f)
+                        )
                 },
                 label = "liquidTabTransition"
             ) { tab ->
