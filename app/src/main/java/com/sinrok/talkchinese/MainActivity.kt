@@ -5,6 +5,9 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedVisibility
@@ -18,6 +21,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +52,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -396,6 +406,39 @@ private fun BrandMark(size: Int) {
     }
 }
 
+
+@Composable
+private fun DragonMascot(size: Int) {
+    val motion = rememberInfiniteTransition(label = "dragonMascotMotion")
+    val bob by motion.animateFloat(
+        initialValue = -3.5f,
+        targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(animation = tween(1700), repeatMode = RepeatMode.Reverse),
+        label = "dragonFloat"
+    )
+    val tilt by motion.animateFloat(
+        initialValue = -2f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(animation = tween(2300), repeatMode = RepeatMode.Reverse),
+        label = "dragonTilt"
+    )
+    Box(
+        Modifier.size(size.dp)
+            .graphicsLayer { translationY = bob; rotationZ = tilt }
+            .clip(RoundedCornerShape((size * 0.34f).dp))
+            .background(Brush.radialGradient(listOf(Color(0xFFFFE5B5), Color(0xFF8E1725), Color(0xFF350B13))))
+            .border(1.dp, Gold.copy(alpha = 0.8f), RoundedCornerShape((size * 0.34f).dp))
+            .padding(3.dp)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.talkchinese_dragon),
+            contentDescription = "Китайский дракон — маскот TalkChinese",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((size * 0.30f).dp))
+        )
+    }
+}
+
 @Composable
 private fun MainShell(
     context: Context,
@@ -419,13 +462,15 @@ private fun MainShell(
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
-                    (fadeIn(animationSpec = tween(260)) + slideInHorizontally(
-                        animationSpec = tween(320),
-                        initialOffsetX = { fullWidth -> fullWidth / 14 }
-                    )).togetherWith(fadeOut(animationSpec = tween(180)) + slideOutHorizontally(
-                        animationSpec = tween(240),
-                        targetOffsetX = { fullWidth -> -fullWidth / 18 }
-                    ))
+                    (fadeIn(animationSpec = tween(300)) + slideInHorizontally(
+                        animationSpec = tween(420),
+                        initialOffsetX = { fullWidth -> fullWidth / 12 }
+                    ) + scaleIn(animationSpec = tween(360), initialScale = 0.965f)).togetherWith(
+                        fadeOut(animationSpec = tween(190)) + slideOutHorizontally(
+                            animationSpec = tween(300),
+                            targetOffsetX = { fullWidth -> -fullWidth / 22 }
+                        ) + scaleOut(animationSpec = tween(260), targetScale = 1.025f)
+                    )
                 },
                 label = "liquidTabTransition"
             ) { tab ->
@@ -640,7 +685,7 @@ private fun HomeScreen(email: String, onStartLearning: () -> Unit) {
                 Text("Продолжим учиться?", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                 Text(email, color = Muted, fontSize = 12.sp)
             }
-            BrandMark(54)
+            DragonMascot(70)
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -783,9 +828,7 @@ private fun LessonsScreen(context: Context) {
                 Text("学习 · Уроки", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Китайский в твоём ритме", color = Muted, fontSize = 13.sp)
             }
-            Surface(shape = CircleShape, color = Gold.copy(alpha = .24f), border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = .65f))) {
-                Text("中文", Modifier.padding(horizontal = 13.dp, vertical = 10.dp), color = Lacquer, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-            }
+            DragonMascot(62)
         }
 
         Surface(shape = RoundedCornerShape(28.dp), color = DeepRed, border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = .55f)), shadowElevation = 5.dp) {
@@ -933,7 +976,7 @@ private fun ModePill(title: String, selected: Boolean, modifier: Modifier = Modi
 
 @Composable
 private fun GlassLessonCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(27.dp), color = Color.White.copy(alpha = .76f),
+    Surface(modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = tween(280)), shape = RoundedCornerShape(27.dp), color = Color.White.copy(alpha = .76f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .95f)), shadowElevation = 3.dp) {
         Column(Modifier.fillMaxWidth().padding(19.dp), verticalArrangement = Arrangement.spacedBy(11.dp), content = content)
     }
@@ -979,8 +1022,13 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Словарь", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Ищи по иероглифам, пиньиню или русскому переводу.", color = Muted, fontSize = 14.sp)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Словарь", color = Ink, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Ищи иероглифы и значения", color = Muted, fontSize = 13.sp)
+            }
+            DragonMascot(60)
+        }
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
@@ -1051,7 +1099,10 @@ private fun AccountsScreen(email: String, onLogout: () -> Unit) {
     val displayName = email.substringBefore("@").replace(".", " ").replace("_", " ")
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Аккаунт", color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Аккаунт", Modifier.weight(1f), color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+            DragonMascot(62)
+        }
         Surface(shape = RoundedCornerShape(30.dp), color = CardWhite, shadowElevation = 4.dp) {
             Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
                 Box(Modifier.size(76.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFFFE6D8), Color(0xFFD7A9A0)))), contentAlignment = Alignment.Center) {
@@ -1092,8 +1143,13 @@ private fun SettingsScreen(context: Context, email: String, onLogout: () -> Unit
     var showPinyin by remember { mutableStateOf(prefs.getBoolean("show_pinyin", true)) }
     var haptics by remember { mutableStateOf(prefs.getBoolean("haptics", true)) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Настройки", color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Персонализируй обучение", color = Muted, fontSize = 14.sp)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Настройки", color = Ink, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Персонализируй обучение", color = Muted, fontSize = 13.sp)
+            }
+            DragonMascot(62)
+        }
         Text("ОБУЧЕНИЕ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
         Surface(shape = RoundedCornerShape(24.dp), color = CardWhite, shadowElevation = 2.dp) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
