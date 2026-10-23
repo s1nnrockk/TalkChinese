@@ -679,10 +679,13 @@ private fun MainShell(
     onSearchQueryChange: (String) -> Unit,
     onLogout: () -> Unit
 ) {
+    val uiPrefs = remember(context) { context.getSharedPreferences("talkchinese_ui_settings", Context.MODE_PRIVATE) }
+    var liquidGlassEnabled by remember(context) { mutableStateOf(uiPrefs.getBoolean("liquid_glass", true)) }
+
     Scaffold(
         containerColor = Paper,
         bottomBar = {
-            LiquidBottomBar(selected = selectedTab, onSelect = onTabSelected)
+            LiquidBottomBar(selected = selectedTab, onSelect = onTabSelected, liquidGlassEnabled = liquidGlassEnabled)
         }
     ) { padding ->
         Column(
@@ -724,7 +727,16 @@ private fun MainShell(
                     MainTab.DIALOGUES -> DialoguesScreen()
                     MainTab.SEARCH -> SearchScreen(context, searchQuery, onSearchQueryChange)
                     MainTab.ACCOUNTS -> AccountsScreen(email, onLogout)
-                    MainTab.SETTINGS -> SettingsScreen(context, email, onLogout)
+                    MainTab.SETTINGS -> SettingsScreen(
+                        context = context,
+                        email = email,
+                        onLogout = onLogout,
+                        liquidGlassEnabled = liquidGlassEnabled,
+                        onLiquidGlassChange = {
+                            liquidGlassEnabled = it
+                            uiPrefs.edit().putBoolean("liquid_glass", it).apply()
+                        }
+                    )
                 }
             }
         }
@@ -732,33 +744,34 @@ private fun MainShell(
 }
 
 @Composable
-private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
+private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit, liquidGlassEnabled: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
+        color = if (liquidGlassEnabled) Color.Transparent else Paper,
+        shadowElevation = if (liquidGlassEnabled) 0.dp else 5.dp,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(
+                    if (liquidGlassEnabled) Brush.verticalGradient(
                         listOf(
                             Color(0xFFFDFBFA).copy(alpha = 0.78f),
                             Color(0xFFF6EAE6).copy(alpha = 0.86f),
                             Color(0xFFFFFDF8).copy(alpha = 0.91f)
                         )
-                    )
+                    ) else Brush.verticalGradient(listOf(Paper, Color(0xFFFFF8EF)))
                 )
                 .border(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.95f), Color(0xFFDCC6BD).copy(alpha = 0.7f))
+                        listOf(Color.White.copy(alpha = if (liquidGlassEnabled) 0.95f else 0.75f), Color(0xFFDCC6BD).copy(alpha = if (liquidGlassEnabled) 0.7f else 0.45f))
                     ),
                     shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
                 )
         ) {
+            if (liquidGlassEnabled) {
             // Glossy reflection along the upper edge gives the bar a glass-like finish.
             Box(
                 Modifier
@@ -777,6 +790,7 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                         )
                     )
             )
+            }
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -828,8 +842,8 @@ private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
                                         )
                                     ) else Brush.verticalGradient(
                                         listOf(
-                                            Color.White.copy(alpha = 0.58f),
-                                            Color(0xFFFFFDF8).copy(alpha = 0.20f)
+                                            Color.White.copy(alpha = if (liquidGlassEnabled) 0.58f else 0.88f),
+                                            Color(0xFFFFFDF8).copy(alpha = if (liquidGlassEnabled) 0.20f else 0.65f)
                                         )
                                     )
                                 )
@@ -1477,7 +1491,7 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
 
     var debouncedQuery by remember { mutableStateOf("") }
     LaunchedEffect(query) {
-        kotlinx.coroutines.delay(140)
+        kotlinx.coroutines.delay(220)
         debouncedQuery = query
     }
     val normalizedQuery = remember(debouncedQuery) { normalizeDictionaryQuery(debouncedQuery.trim()) }
@@ -1517,7 +1531,7 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
                             }
                         }.thenBy { it.entry.hanzi.length }
                     )
-                    .take(100)
+                    .take(35)
                     .map { it.entry }
                     .toList()
             }
@@ -1577,7 +1591,7 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
                 }
             }
             else -> {
-                Text("Найдено: ${results.size}${if (results.size == 100) "+" else ""}", color = Muted, fontSize = 12.sp)
+                Text("Найдено: ${results.size}${if (results.size == 35) "+" else ""}", color = Muted, fontSize = 12.sp)
                 results.forEach { entry ->
                     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = CardWhite, shadowElevation = 2.dp) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1661,7 +1675,13 @@ private fun AccountsScreen(email: String, onLogout: () -> Unit) {
 }
 
 @Composable
-private fun SettingsScreen(context: Context, email: String, onLogout: () -> Unit) {
+private fun SettingsScreen(
+    context: Context,
+    email: String,
+    onLogout: () -> Unit,
+    liquidGlassEnabled: Boolean,
+    onLiquidGlassChange: (Boolean) -> Unit
+) {
     val prefs = remember(context) { context.getSharedPreferences("talkchinese_ui_settings", Context.MODE_PRIVATE) }
     var soundEnabled by remember { mutableStateOf(prefs.getBoolean("sound", true)) }
     var dailyReminder by remember { mutableStateOf(prefs.getBoolean("daily_reminder", false)) }
@@ -1674,6 +1694,17 @@ private fun SettingsScreen(context: Context, email: String, onLogout: () -> Unit
                 Text("Персонализируй обучение", color = Muted, fontSize = 13.sp)
             }
             DragonMascot(62)
+        }
+        Text("ВНЕШНИЙ ВИД", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        Surface(shape = RoundedCornerShape(24.dp), color = CardWhite, shadowElevation = 2.dp) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                PreferenceRow(
+                    "Liquid Glass",
+                    if (liquidGlassEnabled) "Стеклянная нижняя панель и блики включены" else "Обычная панель без стеклянных эффектов",
+                    liquidGlassEnabled,
+                    onLiquidGlassChange
+                )
+            }
         }
         Text("ОБУЧЕНИЕ", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
         Surface(shape = RoundedCornerShape(24.dp), color = CardWhite, shadowElevation = 2.dp) {
