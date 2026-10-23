@@ -745,177 +745,84 @@ private fun MainShell(
 
 @Composable
 private fun LiquidBottomBar(selected: MainTab, onSelect: (MainTab) -> Unit, liquidGlassEnabled: Boolean) {
+    val topShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = if (liquidGlassEnabled) Color.Transparent else Paper,
-        shadowElevation = if (liquidGlassEnabled) 0.dp else 5.dp,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+        color = if (liquidGlassEnabled) Color(0xFFF9F0E8).copy(alpha = 0.94f) else Paper,
+        shadowElevation = if (liquidGlassEnabled) 2.dp else 5.dp,
+        shape = topShape,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (liquidGlassEnabled) Color.White.copy(alpha = 0.95f) else Color(0xFFDCC6BD).copy(alpha = 0.65f)
+        )
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    if (liquidGlassEnabled) Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFFDFBFA).copy(alpha = 0.78f),
-                            Color(0xFFF6EAE6).copy(alpha = 0.86f),
-                            Color(0xFFFFFDF8).copy(alpha = 0.91f)
-                        )
-                    ) else Brush.verticalGradient(listOf(Paper, Color(0xFFFFF8EF)))
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = if (liquidGlassEnabled) 0.95f else 0.75f), Color(0xFFDCC6BD).copy(alpha = if (liquidGlassEnabled) 0.7f else 0.45f))
-                    ),
-                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
-                )
-        ) {
-            if (liquidGlassEnabled) {
-            // Glossy reflection along the upper edge gives the bar a glass-like finish.
+        Column {
+            // One narrow highlight instead of multiple layered glow effects.
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(2.dp)
-                    .align(Alignment.TopCenter)
+                    .height(if (liquidGlassEnabled) 2.dp else 1.dp)
                     .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.95f),
-                                Color(0xFFFFF5D9).copy(alpha = 0.9f),
-                                Color.White.copy(alpha = 0.95f),
-                                Color.Transparent
-                            )
-                        )
+                        if (liquidGlassEnabled) Brush.horizontalGradient(
+                            listOf(Color.Transparent, Color.White, Color(0xFFE8C77D), Color.White, Color.Transparent)
+                        ) else Brush.horizontalGradient(listOf(Color.Transparent, Color(0xFFDCC6BD), Color.Transparent))
                     )
             )
-            }
             Row(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 9.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    .padding(horizontal = 7.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 MainTab.values().forEach { tab ->
                     val active = selected == tab
-                    val scale by animateFloatAsState(
-                        targetValue = if (active) 1f else 0.94f,
-                        animationSpec = spring(dampingRatio = 0.38f, stiffness = 520f),
-                        label = "liquidTabScale"
-                    )
-                    val lift by animateDpAsState(
-                        targetValue = if (active) (-3).dp else 0.dp,
-                        animationSpec = spring(dampingRatio = 0.34f, stiffness = 440f),
-                        label = "liquidTabLift"
-                    )
-                    val pillHeight by animateDpAsState(
-                        targetValue = if (active) 57.dp else 49.dp,
-                        animationSpec = spring(dampingRatio = 0.36f, stiffness = 380f),
-                        label = "liquidTabHeight"
-                    )
+                    val itemShape = RoundedCornerShape(18.dp)
                     Column(
-                        Modifier
+                        modifier = Modifier
                             .weight(1f)
-                            .height(62.dp)
-                            .offset(y = lift)
-                            .scale(scale)
-                            .clip(RoundedCornerShape(21.dp))
+                            .height(57.dp)
+                            .clip(itemShape)
+                            .background(
+                                when {
+                                    active -> Brush.verticalGradient(
+                                        listOf(Color(0xFFFFEAB0), Color(0xFFE4BE70), Color(0xFFD8A75D))
+                                    )
+                                    liquidGlassEnabled -> Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.54f), Color.White.copy(alpha = 0.18f))
+                                    )
+                                    else -> Brush.verticalGradient(listOf(Paper, Color(0xFFFFF8EF)))
+                                }
+                            )
+                            .then(
+                                if (active) Modifier.border(
+                                    1.dp,
+                                    Brush.verticalGradient(listOf(Color.White, Color(0xFFB9823F))),
+                                    itemShape
+                                ) else Modifier
+                            )
                             .clickable { onSelect(tab) }
-                            .padding(horizontal = 1.dp, vertical = 1.dp),
+                            .padding(horizontal = 1.dp, vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(pillHeight)
-                                .clip(RoundedCornerShape(19.dp))
-                                .background(
-                                    if (active) Brush.linearGradient(
-                                        listOf(
-                                            Color(0xFFFFF0C2).copy(alpha = 0.98f),
-                                            Color(0xFFE8C77D).copy(alpha = 0.90f),
-                                            Color(0xFFD9A95E).copy(alpha = 0.94f)
-                                        )
-                                    ) else Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = if (liquidGlassEnabled) 0.58f else 0.88f),
-                                            Color(0xFFFFFDF8).copy(alpha = if (liquidGlassEnabled) 0.20f else 0.65f)
-                                        )
-                                    )
-                                )
-                                .border(
-                                    width = if (active) 1.dp else 0.7.dp,
-                                    brush = Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = if (active) 1f else 0.82f),
-                                            if (active) Color(0xFFB67A39).copy(alpha = 0.78f)
-                                            else Color(0xFFDCCBC5).copy(alpha = 0.46f)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(19.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // A soft specular highlight makes the selected capsule feel like a curved drop.
-                            Box(
-                                Modifier
-                                    .fillMaxWidth(0.62f)
-                                    .height(10.dp)
-                                    .align(Alignment.TopCenter)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(
-                                                Color.White.copy(alpha = 0.0f),
-                                                Color.White.copy(alpha = if (active) 0.78f else 0.48f),
-                                                Color.White.copy(alpha = 0.0f)
-                                            )
-                                        )
-                                    )
+                        Icon(
+                            imageVector = tabIcon(tab),
+                            contentDescription = tab.title,
+                            tint = if (active) DeepRed else Muted,
+                            modifier = Modifier.size(21.dp)
+                        )
+                        if (active) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                tab.title,
+                                color = DeepRed,
+                                fontSize = 9.sp,
+                                lineHeight = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
                             )
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                val iconSize by animateDpAsState(
-                                    targetValue = if (active) 24.dp else 21.dp,
-                                    animationSpec = spring(dampingRatio = 0.30f, stiffness = 320f),
-                                    label = "liquidIconSize"
-                                )
-                                val iconTint by animateColorAsState(
-                                    targetValue = if (active) Lacquer else Muted,
-                                    animationSpec = spring(dampingRatio = 0.78f, stiffness = 460f),
-                                    label = "liquidIconTint"
-                                )
-                                val iconBounce by animateFloatAsState(
-                                    targetValue = if (active) 1.08f else 1f,
-                                    animationSpec = spring(dampingRatio = 0.24f, stiffness = 300f),
-                                    label = "liquidIconBounce"
-                                )
-                                Icon(
-                                    imageVector = tabIcon(tab),
-                                    contentDescription = tab.title,
-                                    tint = iconTint,
-                                    modifier = Modifier.size(iconSize).scale(iconBounce)
-                                )
-                                AnimatedVisibility(
-                                    visible = active,
-                                    enter = fadeIn(),
-                                    exit = fadeOut()
-                                ) {
-                                    Text(
-                                        tab.title,
-                                        fontSize = 9.sp,
-                                        color = DeepRed,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
                         }
                     }
                 }
