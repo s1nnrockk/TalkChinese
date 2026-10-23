@@ -163,7 +163,7 @@ private fun TalkChineseApp(context: Context) {
                             }
 
                             if (message.isNotBlank()) {
-                                Text(message, color = if (message.startsWith("Успех")) Color(0xFF246B43) else Lacquer, fontSize = 13.sp)
+                                Text(message, color = if (message.startsWith("Успех") || message.startsWith("Аккаунт создан.")) Color(0xFF246B43) else Lacquer, fontSize = 13.sp)
                             }
                             if (!configured) {
                                 Text(
