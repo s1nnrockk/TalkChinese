@@ -187,7 +187,7 @@ private fun TalkChineseApp(context: Context) {
                                             val pass = password
                                             Thread {
                                                 val result = runCatching { supabaseAuth(mail, pass, loginMode) }
-                                                runOnUiThread {
+                                                (context as Activity).runOnUiThread {
                                                     busy = false
                                                     result.onSuccess { authResult ->
                                                         if (authResult.first) {
