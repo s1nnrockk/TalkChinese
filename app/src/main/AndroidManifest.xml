@@ -3,6 +3,8 @@
     <application
         android:allowBackup="false"
         android:label="TalkChinese"
+        android:icon="@drawable/talkchinese_dragon"
+        android:roundIcon="@drawable/talkchinese_dragon"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
