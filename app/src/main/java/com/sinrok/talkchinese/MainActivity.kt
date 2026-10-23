@@ -474,18 +474,30 @@ private fun DragonMascot(size: Int) {
     }
 }
 
+private fun configureChineseVoice(tts: TextToSpeech): Boolean {
+    val chineseVoices = runCatching {
+        tts.voices.orEmpty().filter { it.locale.language == "zh" && it.locale.country in setOf("CN", "") }
+    }.getOrDefault(emptyList())
+    val preferredVoice = chineseVoices.filterNot { it.isNetworkConnectionRequired }.maxByOrNull { it.quality }
+        ?: chineseVoices.maxByOrNull { it.quality }
+    if (preferredVoice != null) runCatching { tts.voice = preferredVoice }
+    val result = tts.setLanguage(Locale.SIMPLIFIED_CHINESE)
+    return result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+}
+
 @Composable
 private fun ChineseAudioButton(hanzi: String, pinyin: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var ready by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    val ttsHolder = remember(context) { arrayOfNulls<TextToSpeech>(1) }
     val tts = remember(context) {
         TextToSpeech(context.applicationContext) { status ->
-            ready = status == TextToSpeech.SUCCESS
-            if (status != TextToSpeech.SUCCESS) {
-                failed = true
-            }
-        }
+            val engine = ttsHolder[0]
+            val voiceReady = status == TextToSpeech.SUCCESS && engine != null && configureChineseVoice(engine)
+            ready = voiceReady
+            if (!voiceReady) failed = true
+        }.also { ttsHolder[0] = it }
     }
     DisposableEffect(tts) {
         onDispose { tts.stop(); tts.shutdown() }
@@ -498,10 +510,9 @@ private fun ChineseAudioButton(hanzi: String, pinyin: String) {
         Row(
             modifier = Modifier.clickable {
                 if (ready) {
-                    val locale = Locale.SIMPLIFIED_CHINESE
-                    val localeResult = tts.setLanguage(locale)
-                    if (localeResult != TextToSpeech.LANG_MISSING_DATA && localeResult != TextToSpeech.LANG_NOT_SUPPORTED) {
-                        tts.setSpeechRate(0.82f)
+                    if (configureChineseVoice(tts)) {
+                        tts.setPitch(1.0f)
+                        tts.setSpeechRate(0.92f)
                         tts.speak(hanzi, TextToSpeech.QUEUE_FLUSH, null, "talkchinese_${hanzi}_${pinyin}")
                     } else failed = true
                 } else failed = true
@@ -552,19 +563,22 @@ private fun DialoguesScreen() {
     var ready by remember { mutableStateOf(false) }
     var audioError by remember { mutableStateOf(false) }
     var expanded by remember { mutableIntStateOf(0) }
+    val dialogueTtsHolder = remember(context) { arrayOfNulls<TextToSpeech>(1) }
     val tts = remember(context) {
         TextToSpeech(context.applicationContext) { status ->
-            ready = status == TextToSpeech.SUCCESS
-            if (status != TextToSpeech.SUCCESS) audioError = true
-        }
+            val engine = dialogueTtsHolder[0]
+            val voiceReady = status == TextToSpeech.SUCCESS && engine != null && configureChineseVoice(engine)
+            ready = voiceReady
+            if (!voiceReady) audioError = true
+        }.also { dialogueTtsHolder[0] = it }
     }
     DisposableEffect(tts) { onDispose { tts.stop(); tts.shutdown() } }
     fun speakLine(item: DialogueLine, queue: Int = TextToSpeech.QUEUE_FLUSH) {
         if (!ready) { audioError = true; return }
-        val result = tts.setLanguage(Locale.SIMPLIFIED_CHINESE)
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) { audioError = true; return }
-        tts.setPitch(if (item.speaker == 0) 1.08f else 0.88f)
-        tts.setSpeechRate(0.86f)
+        if (!configureChineseVoice(tts)) { audioError = true; return }
+        // Keep both dialogue roles at a natural pitch; artificial pitch shifts sound comic.
+        tts.setPitch(1.0f)
+        tts.setSpeechRate(0.90f)
         tts.speak(item.hanzi, queue, null, "dialog_" + item.speaker + "_" + item.hanzi.hashCode() + "_" + System.nanoTime())
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -1027,7 +1041,12 @@ private fun LessonsScreen(context: Context) {
     var reviewOnly by remember { mutableStateOf(false) }
     var reviewRefresh by remember { mutableIntStateOf(0) }
     var dailyCount by remember { mutableIntStateOf(0) }
+    val lessonScrollState = rememberScrollState()
     val today = remember { java.time.LocalDate.now().toString() }
+
+    LaunchedEffect(index, level, reviewOnly) {
+        lessonScrollState.animateScrollTo(0)
+    }
 
     LaunchedEffect(context) {
         val result = runCatching { withContext(Dispatchers.IO) { readDictionary(context) } }
@@ -1070,7 +1089,7 @@ private fun LessonsScreen(context: Context) {
     val progress = if (lessons.isEmpty()) 0f else completedInLevel.toFloat() / lessons.size.toFloat()
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().verticalScroll(lessonScrollState)
             .background(Brush.verticalGradient(listOf(Paper, Color(0xFFFFF1E2), Color(0xFFF8E9DF))))
             .padding(horizontal = 18.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(15.dp)
@@ -1336,8 +1355,13 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
         loading = false
     }
 
-    val normalizedQuery = remember(query) { normalizeDictionaryQuery(query.trim()) }
-    // Normalize each dictionary entry only when the dictionary loads, not on every keystroke.
+    var debouncedQuery by remember { mutableStateOf("") }
+    LaunchedEffect(query) {
+        kotlinx.coroutines.delay(140)
+        debouncedQuery = query
+    }
+    val normalizedQuery = remember(debouncedQuery) { normalizeDictionaryQuery(debouncedQuery.trim()) }
+    // Build normalized keys once, then search in the background so typing stays responsive.
     val searchIndex = remember(entries) {
         entries.map { entry ->
             DictionarySearchItem(
@@ -1349,27 +1373,35 @@ private fun SearchScreen(context: Context, query: String, onQueryChange: (String
             )
         }
     }
-    val results = remember(searchIndex, normalizedQuery, query) {
-        if (normalizedQuery.isBlank()) emptyList() else searchIndex.asSequence()
-            .filter { item ->
-                item.hanziKey.contains(normalizedQuery) ||
-                    item.pinyinKey.contains(normalizedQuery) ||
-                    item.russianKey.contains(normalizedQuery) ||
-                    item.englishKey.contains(normalizedQuery)
-            }
-            .sortedWith(
-                compareBy<DictionarySearchItem> {
-                    when {
-                        it.hanziKey == normalizedQuery -> 0
-                        it.pinyinKey == normalizedQuery -> 1
-                        it.entry.hanzi.startsWith(query.trim()) -> 2
-                        else -> 3
+    var results by remember { mutableStateOf<List<DictionaryEntry>>(emptyList()) }
+    LaunchedEffect(searchIndex, normalizedQuery, debouncedQuery) {
+        if (normalizedQuery.isBlank()) {
+            results = emptyList()
+        } else {
+            val rawQuery = debouncedQuery.trim()
+            results = withContext(Dispatchers.Default) {
+                searchIndex.asSequence()
+                    .filter { item ->
+                        item.hanziKey.contains(normalizedQuery) ||
+                            item.pinyinKey.contains(normalizedQuery) ||
+                            item.russianKey.contains(normalizedQuery) ||
+                            item.englishKey.contains(normalizedQuery)
                     }
-                }.thenBy { it.entry.hanzi.length }
-            )
-            .take(100)
-            .map { it.entry }
-            .toList()
+                    .sortedWith(
+                        compareBy<DictionarySearchItem> {
+                            when {
+                                it.hanziKey == normalizedQuery -> 0
+                                it.pinyinKey == normalizedQuery -> 1
+                                it.entry.hanzi.startsWith(rawQuery) -> 2
+                                else -> 3
+                            }
+                        }.thenBy { it.entry.hanzi.length }
+                    )
+                    .take(100)
+                    .map { it.entry }
+                    .toList()
+            }
+        }
     }
 
     Column(
