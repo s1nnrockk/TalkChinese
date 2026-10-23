@@ -412,30 +412,68 @@ private fun BrandMark(size: Int) {
 private fun DragonMascot(size: Int) {
     val motion = rememberInfiniteTransition(label = "dragonMascotMotion")
     val bob by motion.animateFloat(
-        initialValue = -3.5f,
-        targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(animation = tween(1700), repeatMode = RepeatMode.Reverse),
+        initialValue = -4.5f, targetValue = 4.5f,
+        animationSpec = infiniteRepeatable(animation = tween(1850), repeatMode = RepeatMode.Reverse),
         label = "dragonFloat"
     )
     val tilt by motion.animateFloat(
-        initialValue = -2f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(animation = tween(2300), repeatMode = RepeatMode.Reverse),
+        initialValue = -3.2f, targetValue = 3.2f,
+        animationSpec = infiniteRepeatable(animation = tween(2600), repeatMode = RepeatMode.Reverse),
         label = "dragonTilt"
+    )
+    val yaw by motion.animateFloat(
+        initialValue = -5f, targetValue = 5f,
+        animationSpec = infiniteRepeatable(animation = tween(3200), repeatMode = RepeatMode.Reverse),
+        label = "dragonPerspective"
+    )
+    val glow by motion.animateFloat(
+        initialValue = 0.28f, targetValue = 0.72f,
+        animationSpec = infiniteRepeatable(animation = tween(1450), repeatMode = RepeatMode.Reverse),
+        label = "dragonGoldGlow"
     )
     Box(
         Modifier.size(size.dp)
-            .graphicsLayer { translationY = bob; rotationZ = tilt }
-            .clip(RoundedCornerShape((size * 0.34f).dp))
-            .background(Brush.radialGradient(listOf(Color(0xFFFFE5B5), Color(0xFF8E1725), Color(0xFF350B13))))
-            .border(1.dp, Gold.copy(alpha = 0.8f), RoundedCornerShape((size * 0.34f).dp))
+            .graphicsLayer {
+                translationY = bob
+                rotationZ = tilt
+                rotationY = yaw
+                rotationX = -yaw * 0.42f
+                cameraDistance = 18f * density
+                shadowElevation = 12.dp.toPx()
+                shape = RoundedCornerShape((size * 0.34f).dp)
+                clip = true
+            }
+            .background(
+                Brush.radialGradient(
+                    listOf(Color(0xFFFFF0C5).copy(alpha = glow), Color(0xFFB72B3A), Color(0xFF350B13))
+                ),
+                RoundedCornerShape((size * 0.34f).dp)
+            )
+            .border(1.4.dp, Brush.linearGradient(
+                listOf(Color.White.copy(alpha = 0.96f), Gold.copy(alpha = glow), Color(0xFF8D5B2A))
+            ), RoundedCornerShape((size * 0.34f).dp))
             .padding(3.dp)
     ) {
         Image(
             painter = painterResource(id = R.drawable.talkchinese_dragon),
-            contentDescription = "Китайский дракон — маскот TalkChinese",
+            contentDescription = "Китайский дракон TalkChinese с объёмной анимацией",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape((size * 0.30f).dp))
+            modifier = Modifier.fillMaxSize()
+                .graphicsLayer {
+                    rotationY = -yaw * 0.32f
+                    scaleX = 1.015f
+                    scaleY = 1.015f
+                }
+                .clip(RoundedCornerShape((size * 0.30f).dp))
+        )
+        // Moving specular highlight gives the glass frame a polished, liquid-glass finish.
+        Box(
+            Modifier.fillMaxWidth(0.72f).height((size * 0.14f).dp)
+                .align(Alignment.TopCenter)
+                .clip(CircleShape)
+                .background(Brush.horizontalGradient(
+                    listOf(Color.Transparent, Color.White.copy(alpha = glow), Color.Transparent)
+                ))
         )
     }
 }
